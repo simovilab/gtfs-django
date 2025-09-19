@@ -2,12 +2,12 @@
 
 
 def import_gtfs_schedule():
-    pass
+    return "Imported GTFS Schedule"
 
 
 def export_gtfs_schedule():
-    pass
+    return "Exported GTFS Schedule"
 
 
 def validate_gtfs_schedule():
-    pass
+    return "Validated GTFS Schedule"

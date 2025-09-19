@@ -1,3 +1,7 @@
+# Django migrations
+**/migrations/
+**/migrations/*.py
+**/migrations/*.pyc
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -2,25 +2,25 @@ from .stop_times import estimate_stop_times
 
 
 def build_vehicle_positions():
-    pass
+    return "One day, vehicle_positions.pb"
 
 
 def build_trip_updates():
     estimate_stop_times()
-    pass
+    return "One day, trip_updates.pb"
 
 
 def build_alerts():
-    pass
+    return "One day, alerts.pb"
 
 
 def get_vehicle_positions():
-    pass
+    return "Saved vehicle positions"
 
 
 def get_trip_updates():
-    pass
+    return "Saved trip updates"
 
 
 def get_alerts():
-    pass
+    return "Saved alerts"

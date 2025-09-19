@@ -33,3 +33,12 @@ class TestGtfsPackage:
         assert hasattr(gtfs.models, "Feed")
         assert hasattr(gtfs.models, "Agency")
         assert hasattr(gtfs.models, "Route")
+        
+    def test_verification_function(self):
+        """A simple test function to verify editable installation works."""
+        return "Version 1 - Initial test"
+        
+
+def simple_test_function():
+    """A standalone function to test editable installation."""
+    return "Version 1 - Editable installation working!"

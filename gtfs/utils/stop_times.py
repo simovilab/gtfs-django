@@ -1,2 +1,2 @@
 def estimate_stop_times():
-    pass
+    return "Estimated stop times"
