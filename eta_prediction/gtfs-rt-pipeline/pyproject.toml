@@ -1,0 +1,22 @@
+[project]
+name = "gtfs-rt-pipeline"
+version = "0.1.0"
+description = "Django + Celery pipeline for GTFS-Realtime ingestion"
+requires-python = ">=3.11"
+dependencies = [
+  "Django>=5.0",
+  "celery>=5.4",
+  "redis>=5.0",
+  "psycopg[binary,pool]>=3.2",
+  "django-environ>=0.11",
+  "python-dotenv>=1.0",
+  "requests>=2.32",
+  "gtfs-realtime-bindings>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["ipython", "black", "pytest", "pytest-django", "mypy"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
