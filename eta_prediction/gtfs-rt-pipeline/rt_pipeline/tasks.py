@@ -38,9 +38,9 @@ def fetch_vehicle_positions(self):
 
     try:
         with transaction.atomic():
-            feed_label = f'{settings.FEED_NAME}:VP'
             obj = RawMessage.objects.create(
-                feed_name=feed_label,
+                feed_name=settings.FEED_NAME,
+                message_type=RawMessage.MESSAGE_TYPE_VEHICLE_POSITIONS,
                 header_timestamp=header_ts,
                 incrementality=inc,
                 content=r.content,
@@ -48,7 +48,11 @@ def fetch_vehicle_positions(self):
             )
     except IntegrityError:
         # duplicate blob
-        existing = RawMessage.objects.filter(feed_name=settings.FEED_NAME, content_hash=h).first()
+        existing = RawMessage.objects.filter(
+            feed_name=settings.FEED_NAME,
+            message_type=RawMessage.MESSAGE_TYPE_VEHICLE_POSITIONS,
+            content_hash=h
+        ).first()
         return {"created": False, "raw_message_id": str(existing.id) if existing else None}
 
     parse_and_upsert_vehicle_positions.delay(str(obj.id))
@@ -97,17 +101,6 @@ def parse_and_upsert_vehicle_positions(self, raw_message_id: str):
 
     return {"inserted": inserted}
 
-# ---- Celery Beat schedule (lives here for clarity) ----
-from celery.schedules import schedule
-from ingestproj.celery import app as celery_app
-
-celery_app.conf.beat_schedule = {
-    "poll-vehicle-positions": {
-        "task": "rt_pipeline.tasks.fetch_vehicle_positions",
-        "schedule": schedule(run_every=settings.POLL_SECONDS),
-    },
-}
-
 # Trip Updates tasks
 @shared_task(bind=True, autoretry_for=(requests.RequestException,), retry_backoff=True, retry_kwargs={"max_retries": 5})
 def fetch_trip_updates(self):
@@ -127,25 +120,31 @@ def fetch_trip_updates(self):
     header_ts = _to_ts(getattr(feed.header, "timestamp", None))
     incr = str(getattr(feed.header, "incrementality", "")) if hasattr(feed.header, "incrementality") else None
 
-    with transaction.atomic():
-        feed_label = f'{settings.FEED_NAME}:TU'
-        raw = RawMessage.objects.create(
-            feed_name=feed_label,
-            content_hash=content_hash,
-            header_timestamp=header_ts,
-            incrementality=incr,
-            content=raw_bytes
-        )
+    try:
+        with transaction.atomic():
+            raw = RawMessage.objects.create(
+                feed_name=settings.FEED_NAME,
+                message_type=RawMessage.MESSAGE_TYPE_TRIP_UPDATES,
+                content_hash=content_hash,
+                header_timestamp=header_ts,
+                incrementality=incr,
+                content=raw_bytes
+            )
+    except IntegrityError:
+        # duplicate blob
+        existing = RawMessage.objects.filter(
+            feed_name=settings.FEED_NAME,
+            message_type=RawMessage.MESSAGE_TYPE_TRIP_UPDATES,
+            content_hash=content_hash
+        ).first()
+        return {"created": False, "raw_message_id": str(existing.id) if existing else None}
 
-    # if created:
-        # only parse if this payload is new
-    parse_and_upsert_trip_updates.delay(raw.id)
-    return {"queued_parse": raw.id, "hash": content_hash}
-    # else:
-    #     return {"skipped": "duplicate_raw", "hash": content_hash}
+    # only parse if this payload is new
+    parse_and_upsert_trip_updates.delay(str(raw.id))
+    return {"created": True, "raw_message_id": str(raw.id), "hash": content_hash}
 
 @shared_task(bind=True)
-def parse_and_upsert_trip_updates(self, raw_id: int):
+def parse_and_upsert_trip_updates(self, raw_id: str):
     """Parse a stored RawMessage (TU) into TripUpdate rows (one per StopTimeUpdate)."""
     raw = RawMessage.objects.get(id=raw_id)
     feed = gtfs_realtime_pb2.FeedMessage()
@@ -182,7 +181,7 @@ def parse_and_upsert_trip_updates(self, raw_id: int):
             stu_sr = str(getattr(stu, "schedule_relationship", "")) if stu else None
 
             rows.append(TripUpdate(
-                feed_name=raw.feed_name,
+                feed_name=settings.FEED_NAME,
                 ts=tu_ts,
                 trip_id=trip_id,
                 route_id=route_id,
@@ -204,7 +203,15 @@ def parse_and_upsert_trip_updates(self, raw_id: int):
         TripUpdate.objects.bulk_create(rows, ignore_conflicts=True)
     return {"parsed_rows": len(rows)}
 
+# ---- Celery Beat schedule ----
+from celery.schedules import schedule
+from ingestproj.celery import app as celery_app
+
 celery_app.conf.beat_schedule = {
+    "poll-vehicle-positions": {
+        "task": "rt_pipeline.tasks.fetch_vehicle_positions",
+        "schedule": schedule(run_every=settings.POLL_SECONDS),
+    },
     "poll-trip-updates": {
         "task": "rt_pipeline.tasks.fetch_trip_updates",
         "schedule": schedule(run_every=settings.POLL_SECONDS),

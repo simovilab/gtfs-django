@@ -3,13 +3,14 @@ from .models import RawMessage, VehiclePosition, TripUpdate
 
 @admin.register(RawMessage)
 class RawMessageAdmin(admin.ModelAdmin):
-    list_display = ("feed_name", "fetched_at", "header_timestamp", "incrementality", "content_hash")
+    list_display = ("feed_name", "message_type", "fetched_at", "header_timestamp", "incrementality", "content_hash")
     search_fields = ("feed_name", "content_hash")
-    list_filter = ("feed_name", "incrementality")
+    list_filter = ("feed_name", "message_type", "incrementality")
     date_hierarchy = "fetched_at"
     ordering = ("-fetched_at",)
 
-    def __str__(self): return f"{self.feed_name} @ {self.fetched_at:%Y-%m-%d %H:%M:%S}"
+    def __str__(self): 
+        return f"{self.feed_name}:{self.message_type} @ {self.fetched_at:%Y-%m-%d %H:%M:%S}"
 
 @admin.register(VehiclePosition)
 class VehiclePositionAdmin(admin.ModelAdmin):
@@ -19,7 +20,8 @@ class VehiclePositionAdmin(admin.ModelAdmin):
     date_hierarchy = "ts"
     ordering = ("-ts",)
 
-    def __str__(self): return f"{self.feed_name}:{self.vehicle_id} @ {self.ts:%Y-%m-%d %H:%M:%S}"
+    def __str__(self): 
+        return f"{self.feed_name}:{self.vehicle_id} @ {self.ts:%Y-%m-%d %H:%M:%S}"
 
 @admin.register(TripUpdate)
 class TripUpdateAdmin(admin.ModelAdmin):

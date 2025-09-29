@@ -2,8 +2,17 @@ from django.db import models
 import uuid
 
 class RawMessage(models.Model):
+    # Message type choices
+    MESSAGE_TYPE_VEHICLE_POSITIONS = 'VP'
+    MESSAGE_TYPE_TRIP_UPDATES = 'TU'
+    MESSAGE_TYPE_CHOICES = [
+        (MESSAGE_TYPE_VEHICLE_POSITIONS, 'Vehicle Positions'),
+        (MESSAGE_TYPE_TRIP_UPDATES, 'Trip Updates'),
+    ]
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     feed_name = models.TextField()
+    message_type = models.CharField(max_length=3, choices=MESSAGE_TYPE_CHOICES)
     fetched_at = models.DateTimeField(auto_now_add=True)
     header_timestamp = models.DateTimeField(null=True, blank=True)
     incrementality = models.TextField(null=True, blank=True)
@@ -12,7 +21,13 @@ class RawMessage(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["feed_name", "content_hash"], name="uq_feed_hash")
+            models.UniqueConstraint(
+                fields=["feed_name", "message_type", "content_hash"], 
+                name="uq_feed_type_hash"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["feed_name", "message_type", "-fetched_at"]),
         ]
 
 class VehiclePosition(models.Model):
