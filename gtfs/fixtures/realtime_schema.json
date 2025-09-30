@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "feed_message": {
+      "primary_key": "id",
+      "fields": {
+        "id": "string",
+        "header": "feed_header",
+        "entity": "array<feed_entity>"
+      }
+    },
+    "feed_header": {
+      "primary_key": "header_id",
+      "fields": {
+        "header_id": "string",
+        "gtfs_realtime_version": "string",
+        "incrementality": "string",
+        "timestamp": "integer"
+      }
+    },
+    "feed_entity": {
+      "primary_key": "entity_id",
+      "fields": {
+        "entity_id": "string",
+        "is_deleted": "boolean",
+        "vehicle": "vehicle_position",
+        "trip_update": "trip_update",
+        "alert": "alert"
+      }
+    },
+    "vehicle_position": {
+      "primary_key": "id",
+      "fields": {
+        "id": "string",
+        "trip_id": "string",
+        "vehicle_id": "string",
+        "vehicle_label": "string",
+        "vehicle_license": "string",
+        "position_lat": "float",
+        "position_lon": "float",
+        "position_bearing": "float",
+        "timestamp": "integer",
+        "stop_id": "string"
+      },
+      "foreign_keys": {
+        "trip_id": "trip_update.trip_id"
+      }
+    },
+    "trip_update": {
+      "primary_key": "trip_update_id",
+      "fields": {
+        "trip_update_id": "string",
+        "trip_id": "string",
+        "vehicle_id": "string",
+        "stop_time_updates": "array<stop_time_update>",
+        "timestamp": "integer",
+        "delay": "integer"
+      }
+    },
+    "stop_time_update": {
+      "primary_key": "stop_time_update_id",
+      "fields": {
+        "stop_time_update_id": "string",
+        "stop_sequence": "integer",
+        "stop_id": "string",
+        "arrival_time": "integer",
+        "departure_time": "integer",
+        "schedule_relationship": "string"
+      }
+    },
+    "alert": {
+      "primary_key": "alert_id",
+      "fields": {
+        "alert_id": "string",
+        "active_period": "array<period>",
+        "informed_entity": "array<entity_selector>",
+        "cause": "string",
+        "effect": "string",
+        "url": "string",
+        "header_text": "string",
+        "description_text": "string"
+      }
+    }
+  },
+  "version": "1.0.0",
+  "spec": "GTFS Realtime v2.0"
+}
