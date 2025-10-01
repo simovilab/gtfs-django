@@ -11,8 +11,8 @@ ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", default="*").spl
 
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
-    "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
-    "rt_pipeline"
+    "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles", "django.contrib.gis",
+    "rt_pipeline", "sch_pipeline"
 ]
 
 # Admin/templates config (required for admin)
@@ -47,7 +47,10 @@ MIDDLEWARE = [
 ROOT_URLCONF = "ingestproj.urls"
 WSGI_APPLICATION = "ingestproj.wsgi.application"
 
+
 DATABASES = {"default": env.db("DATABASE_URL")}
+DATABASES["default"]["ENGINE"] = "django.contrib.gis.db.backends.postgis"
+
 
 STATIC_URL = "static/"
 
