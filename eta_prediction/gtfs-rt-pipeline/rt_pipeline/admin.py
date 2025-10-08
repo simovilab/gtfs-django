@@ -14,7 +14,7 @@ class RawMessageAdmin(admin.ModelAdmin):
 
 @admin.register(VehiclePosition)
 class VehiclePositionAdmin(admin.ModelAdmin):
-    list_display = ("feed_name", "vehicle_id", "ts", "lat", "lon", "route_id", "trip_id", "speed")
+    list_display = ("feed_name", "vehicle_id", "ts", "lat", "lon", "route_id", "trip_id", "speed", "current_stop_sequence", "raw_message")
     search_fields = ("vehicle_id", "route_id", "trip_id", "feed_name")
     list_filter = ("feed_name", "route_id")
     date_hierarchy = "ts"
@@ -28,8 +28,11 @@ class TripUpdateAdmin(admin.ModelAdmin):
     list_display = (
         "feed_name",
         "trip_id",
-        "route_id",
+        "start_time",
+        "start_date",
+        "schedule_relationship",
         "vehicle_id",
+        "route_id",
         "ts",
         "stop_id",
         "stop_sequence",
@@ -37,6 +40,8 @@ class TripUpdateAdmin(admin.ModelAdmin):
         "departure_time",
         "arrival_delay",
         "departure_delay",
+        "stu_schedule_relationship",
+        "raw_message"
     )
     search_fields = ("trip_id", "route_id", "vehicle_id", "stop_id", "feed_name")
     list_filter = ("feed_name", "route_id")
