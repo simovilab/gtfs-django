@@ -1,6 +1,6 @@
 from .stop_times import estimate_stop_times
 from .fake_stop_times import fake_stop_times
-from .models import Journey, Progression, Position, Occupancy
+from gtfs.models import Journey, Progression, Position, Occupancy
 from celery import shared_task
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -14,7 +14,148 @@ import requests
 from datetime import datetime, timedelta
 from google.transit import gtfs_realtime_pb2 as gtfs_rt
 from google.protobuf import json_format
-from gtfs.models import *
+from gtfs.models import GTFSProvider, FeedMessage, VehiclePosition, TripUpdate, StopTimeUpdate, Alert
+from django.utils import timezone
+from django.utils.timezone import make_aware
+import unittest
+import json
+from google.transit import gtfs_realtime_pb2
+import pytz
+from django.core.cache import cache
+import requests
+from google.protobuf.message import DecodeError
+
+
+class GTFSRealtimeTests(unittest.TestCase):
+    def setUp(self):
+        # Initialize test data with sample identifiers
+        self.test_data = {
+            'trip_id': '123',
+            'vehicle_id': '456',
+            'alert_id': '789',
+            'route_id': 'R001',
+            'stop_id': 'S001'
+        }
+        
+    def test_trip_update_serialization(self):
+        # Create test message with trip update data
+        feed = gtfs_realtime_pb2.FeedMessage()
+        entity = feed.entity.add()
+        trip_update = entity.trip_update
+        
+        # Configure basic trip information
+        trip_update.trip.trip_id = self.test_data['trip_id']
+        trip_update.trip.route_id = self.test_data['route_id']
+        
+        # Configure stop time update with delay
+        stop_time = trip_update.stop_time_update.add()
+        stop_time.stop_sequence = 1
+        stop_time.arrival.delay = 60  # 1 minute delay
+        
+        # Serialize message to binary format
+        serialized_data = feed.SerializeToString()
+        
+        # Deserialize and validate the message
+        parsed_feed = gtfs_realtime_pb2.FeedMessage()
+        parsed_feed.ParseFromString(serialized_data)
+        
+        # Verify trip update fields
+        self.assertEqual(parsed_feed.entity[0].trip_update.trip.trip_id,
+                        self.test_data['trip_id'])
+        self.assertEqual(parsed_feed.entity[0].trip_update.stop_time_update[0].stop_sequence,
+                        1)
+        self.assertEqual(parsed_feed.entity[0].trip_update.stop_time_update[0].arrival.delay,
+                        60)
+
+    def test_vehicle_position_serialization(self):
+        # Create test message with vehicle position data
+        feed = gtfs_realtime_pb2.FeedMessage()
+        entity = feed.entity.add()
+        vehicle_position = entity.vehicle
+        
+        # Configure vehicle identification and location
+        vehicle_position.vehicle.id = self.test_data['vehicle_id']
+        vehicle_position.position.latitude = 37.7749
+        vehicle_position.position.longitude = -122.4194
+        
+        # Serialize message to binary format
+        serialized_data = feed.SerializeToString()
+        
+        # Deserialize and validate the message
+        parsed_feed = gtfs_realtime_pb2.FeedMessage()
+        parsed_feed.ParseFromString(serialized_data)
+        
+        # Verify vehicle position fields
+        self.assertEqual(parsed_feed.entity[0].vehicle.vehicle.id,
+                        self.test_data['vehicle_id'])
+        self.assertAlmostEqual(parsed_feed.entity[0].vehicle.position.latitude,
+                             37.7749, places=4)
+        self.assertAlmostEqual(parsed_feed.entity[0].vehicle.position.longitude,
+                             -122.4194, places=4)
+
+    def test_alert_serialization(self):
+        # Create test message with alert data
+        feed = gtfs_realtime_pb2.FeedMessage()
+        entity = feed.entity.add()
+        alert = entity.alert
+        
+        # Configure alert translations
+        alert.header_text.translations.add(text='Test Alert')
+        alert.description_text.translations.add(text='Alert description')
+        
+        # Add affected entity information
+        informed_entity = alert.informed_entity.add()
+        informed_entity.route_id = self.test_data['route_id']
+        
+        # Serialize message to binary format
+        serialized_data = feed.SerializeToString()
+        
+        # Deserialize and validate the message
+        parsed_feed = gtfs_realtime_pb2.FeedMessage()
+        parsed_feed.ParseFromString(serialized_data)
+        
+        # Verify alert fields
+        self.assertEqual(parsed_feed.entity[0].alert.header_text.translations[0].text,
+                        'Test Alert')
+        self.assertEqual(parsed_feed.entity[0].alert.informed_entity[0].route_id,
+                        self.test_data['route_id'])
+
+    def test_feed_validation(self):
+        # Create valid message for testing
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.header.gtfs_realtime_version = "2.0"
+        entity = feed.entity.add()
+        
+        # Validate valid message
+        self.assertTrue(self._validate_feed(feed))
+        
+        # Create invalid message (missing version)
+        invalid_feed = gtfs_realtime_pb2.FeedMessage()
+        
+        # Validate invalid message
+        self.assertFalse(self._validate_feed(invalid_feed))
+
+    def _validate_feed(self, feed):
+        # Check required GTFS Realtime fields
+        if not feed.header.gtfs_realtime_version:
+            return False
+        if not feed.entity:
+            return False
+        return True
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+
+
+def _format_time(dt):
+    """
+    Formats a datetime.time or datetime.datetime object as "HH:MM:SS" string.
+    """
+    if hasattr(dt, "time"):
+        dt = dt.time()
+    return dt.strftime("%H:%M:%S")
 
 
 def get_vehicle_positions():
@@ -25,10 +166,19 @@ def get_vehicle_positions():
         try:
             vehicle_positions_response = requests.get(provider.vehicle_positions_url)
             print(f"Fetching vehicle positions from {provider.vehicle_positions_url}")
-        except:
-            print(
-                f"Error fetching vehicle positions from {provider.vehicle_positions_url}"
-            )
+        except requests.exceptions.RequestException as e:
+                # timeouts, DNS, HTTP errors
+                print(f"Network error fetching from {provider.vehicle_positions_url}: {e}")
+                continue
+
+        except DecodeError as e:
+            # decoding Protobuf error
+            print(f"Failed to parse Protobuf data from {provider.vehicle_positions_url}: {e}")
+            continue
+
+        except Exception as e:
+            # unexpected errors
+            print(f"Unexpected error processing {provider.code}: {e}")
             continue
         vehicle_positions.ParseFromString(vehicle_positions_response.content)
 
@@ -65,7 +215,7 @@ def get_vehicle_positions():
                 columns=["vehicle_multi_carriage_details"],
                 inplace=True,
             )
-        except:
+        except Exception:
             pass
         # Fix entity timestamp
         vehicle_positions_df["vehicle_timestamp"] = pd.to_datetime(
@@ -305,11 +455,93 @@ def build_trip_updates():
         },
     )
 
-    return f"Feed TripUpdate built."
+    return "Feed TripUpdate built."
 
 def build_alerts():
-    print("Building feed Alert...")
-    return "Feed ServiceAlert built"
+    """
+    Construye el feed de alertas del servicio.
+    """
+    print("Building feed: ServiceAlerts")
+    
+    # Feed message structure
+    feed_dict = {
+        "header": {
+            "gtfs_realtime_version": "2.0",
+            "incrementality": "FULL_DATASET",
+            "timestamp": int(timezone.now().timestamp()),
+        },
+        "entity": [],
+    }
+    
+    alerts = Alert.objects.all()
+    if not alerts.exists():
+        print("No alerts found in database.")
+        return "No alerts to build"
+    
+    for alert in alerts:
+        # Compose one entity per alert
+        entity = {
+            "id": str(alert.alert_id),
+            "alert": {
+                # Required fields
+                "header_text": {
+                    "translation": [{"text": alert.alert_header}]
+                },
+                "description_text": {
+                    "translation": [{"text": alert.alert_description}]
+                },
+                # Required: at least one informed_entity
+                "informed_entity": alert.informed_entity,
+            },
+        }
+        
+        # Optional fields based on GTFS spec
+        active_period = {}
+        if alert.service_start_time:
+            start_dt = datetime.combine(alert.service_date, alert.service_start_time)
+            active_period["start"] = int(make_aware(start_dt).timestamp())
+        if alert.service_end_time:
+            end_dt = datetime.combine(alert.service_date, alert.service_end_time)
+            active_period["end"] = int(make_aware(end_dt).timestamp())
+        if active_period:
+            entity["alert"]["active_period"] = [active_period]
+        
+        if alert.cause:
+            entity["alert"]["cause"] = int(alert.cause)
+        if alert.effect:
+            entity["alert"]["effect"] = int(alert.effect)
+        if alert.alert_url:
+            entity["alert"]["url"] = {"translation": [{"text": alert.alert_url}]}
+        if alert.severity:
+            entity["alert"]["severity_level"] = int(alert.severity)
+        
+        feed_dict["entity"].append(entity)
+    
+    # --- Serialize to JSON file ---
+    feed_json = json.dumps(feed_dict, indent=2)
+    with open("feed/files/alerts.json", "w", encoding="utf-8") as f:
+        f.write(feed_json)
+    print("Saved feed/files/alerts.json")
+    
+    # --- Serialize to Protobuf binary ---
+    feed_pb = json_format.ParseDict(feed_dict, gtfs_rt.FeedMessage())
+    with open("feed/files/alerts.pb", "wb") as f:
+        f.write(feed_pb.SerializeToString())
+    print("Saved feed/files/alerts.pb")
+    
+    # Optionally register in DB as FeedMessage
+    provider = GTFSProvider.objects.filter(is_active=True).first()
+    if provider:
+        FeedMessage.objects.create(
+            feed_message_id=f"{provider.code}-alerts-{feed_dict['header']['timestamp']}",
+            provider=provider,
+            entity_type="alert",
+            timestamp=timezone.now(),
+            incrementality="FULL_DATASET",
+            gtfs_realtime_version="2.0",
+    )
+    
+    return "ServiceAlerts saved to database"
 
 
 def get_vehicle_positions():
@@ -320,9 +552,9 @@ def get_vehicle_positions():
         try:
             vehicle_positions_response = requests.get(provider.vehicle_positions_url)
             print(f"Fetching vehicle positions from {provider.vehicle_positions_url}")
-        except:
+        except Exception as e:
             print(
-                f"Error fetching vehicle positions from {provider.vehicle_positions_url}"
+                f"Error fetching vehicle positions from {provider.vehicle_positions_url}: {e}"
             )
             continue
         vehicle_positions.ParseFromString(vehicle_positions_response.content)
@@ -360,7 +592,7 @@ def get_vehicle_positions():
                 columns=["vehicle_multi_carriage_details"],
                 inplace=True,
             )
-        except:
+        except Exception:
             pass
         # Fix entity timestamp
         vehicle_positions_df["vehicle_timestamp"] = pd.to_datetime(
@@ -553,4 +785,106 @@ def get_trip_updates():
 
 
 def get_service_alerts():
-    return "Fetching Alerts"
+    """
+    Obtiene y procesa las alertas del servicio GTFS Realtime.
+    """
+    providers = GTFSProvider.objects.filter(is_active=True)
+    if not providers.exists():
+        print("No active providers found.")
+        return "No active providers"
+    
+    saved_any = False
+    for provider in providers:
+        try:
+            response = requests.get(provider.service_alerts_url, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            print(f"Error fetching alerts from {provider.service_alerts_url}: {str(e)}")
+            continue
+        
+        # Decode Protobuf binary
+        feed_message = gtfs_rt.FeedMessage()
+        feed_message.ParseFromString(response.content)
+        
+        # Validation (as per GTFS spec)
+        if not feed_message.header.gtfs_realtime_version:
+            print("Invalid feed: missing header.gtfs_realtime_version")
+            continue
+        if not feed_message.entity:
+            print("Empty feed (no alerts).")
+            continue
+        
+        print(f"Decoding {len(feed_message.entity)} alerts from provider {provider.code}...")
+        
+        for entity in feed_message.entity:
+            if not entity.HasField("alert"):
+                continue
+            
+            alert_obj = entity.alert
+            # Extract mandatory fields
+            header_text = (
+                alert_obj.header_text.translation[0].text
+                if alert_obj.header_text.translation
+                else "Sin título"
+            )
+            description_text = (
+                alert_obj.description_text.translation[0].text
+                if alert_obj.description_text.translation
+                else ""
+            )
+            
+            informed_entity = []
+            for info in alert_obj.informed_entity:
+                # EntitySelector may contain route_id, stop_id, trip, etc.
+                entity_info = {}
+                if info.route_id:
+                    entity_info["route_id"] = info.route_id
+                if info.stop_id:
+                    entity_info["stop_id"] = info.stop_id
+                if info.trip.trip_id:
+                    entity_info["trip_id"] = info.trip.trip_id
+                informed_entity.append(entity_info)
+            
+            # Extract time range
+            service_date = datetime.now().date()
+            start_time = None
+            end_time = None
+            if alert_obj.active_period:
+                ap = alert_obj.active_period[0]
+                if ap.HasField("start"):
+                    start_time = datetime.fromtimestamp(
+                        ap.start, 
+                        tz=pytz.timezone(provider.timezone)
+                    ).time()
+                if ap.HasField("end"):
+                    end_time = datetime.fromtimestamp(
+                        ap.end, 
+                        tz=pytz.timezone(provider.timezone)
+                    ).time()
+            
+            # Save to database
+            Alert.objects.create(
+                feed=provider.feed_set.first(),
+                alert_id=entity.id,
+                route_id=informed_entity[0].get("route_id", ""),
+                trip_id=informed_entity[0].get("trip_id", ""),
+                service_date=service_date,
+                service_start_time=start_time or datetime.now().time(),
+                service_end_time=end_time or datetime.now().time(),
+                alert_header=header_text,
+                alert_description=description_text,
+                cause=int(alert_obj.cause) if alert_obj.HasField("cause") else 1,
+                effect=int(alert_obj.effect) if alert_obj.HasField("effect") else 1,
+                severity=int(alert_obj.severity_level) if alert_obj.HasField("severity_level") else 1,
+                published=datetime.now(),
+                updated=datetime.now(),
+                informed_entity=informed_entity,
+            )
+            saved_any = True
+        
+        if saved_any:
+            print("ServiceAlerts saved to database.")
+            return "ServiceAlerts saved to database"
+        else:
+            print("No ServiceAlerts found or decoded.")
+            return "No ServiceAlerts found"
