@@ -27,14 +27,20 @@ copy() {
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "\copy (${query}) TO '${out}' CSV HEADER"
 }
 
-copy "vp_time_range"     "$SQL_DIR/vp_time_range.sql"
-copy "vp_tripid_nulls"            "$SQL_DIR/vp_tripid_nulls.sql"
-copy "vp_tripid_consistency"      "$SQL_DIR/vp_tripid_consistency.sql"
-copy "vp_trip_switches"      "$SQL_DIR/vp_trip_switches.sql"
-copy "vp_gaps_per_vehicle_day"    "$SQL_DIR/vp_gaps_per_vehicle_day.sql"
-copy "vp_gaps_per_day_summary"    "$SQL_DIR/vp_gaps_per_day_summary.sql"
-copy "vp_gap_hist"           "$SQL_DIR/vp_gap_hist.sql"
-copy "vp_gap_ranges"              "$SQL_DIR/vp_gap_ranges.sql"
-copy "sch_nextday_check" "$SQL_DIR/sch_nextday_check.sql"
+# copy "vp_time_range"     "$SQL_DIR/vp_time_range.sql"
+# copy "vp_tripid_nulls"            "$SQL_DIR/vp_tripid_nulls.sql"
+# copy "vp_tripid_consistency"      "$SQL_DIR/vp_tripid_consistency.sql"
+# copy "vp_trip_switches"      "$SQL_DIR/vp_trip_switches.sql"
+# copy "vp_gaps_per_vehicle_day"    "$SQL_DIR/vp_gaps_per_vehicle_day.sql"
+# copy "vp_gaps_per_day_summary"    "$SQL_DIR/vp_gaps_per_day_summary.sql"
+# copy "vp_gap_hist"           "$SQL_DIR/vp_gap_hist.sql"
+# copy "vp_gap_ranges"              "$SQL_DIR/vp_gap_ranges.sql"
+# copy "sch_nextday_check" "$SQL_DIR/sch_nextday_check.sql"
+
+# Loop over all .sql files in the SQL_DIR
+for file in "$SQL_DIR"/*.sql; do
+  name="$(basename "$file" .sql)"
+  copy "$name" "$file"
+done
 
 echo "✅ CSVs written to $OUT_DIR"
