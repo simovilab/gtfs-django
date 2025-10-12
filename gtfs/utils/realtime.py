@@ -22,7 +22,6 @@ import json
 from google.transit import gtfs_realtime_pb2
 import pytz
 from django.core.cache import cache
-import requests
 from google.protobuf.message import DecodeError
 
 
