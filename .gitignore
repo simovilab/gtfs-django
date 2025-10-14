@@ -1,6 +1,6 @@
-# Django migrations
-**/migrations/
-**/migrations/*.py
+# Django migrations - KEEP MIGRATIONS for reusable Django apps
+# **/migrations/
+# **/migrations/*.py
 **/migrations/*.pyc
 # Byte-compiled / optimized / DLL files
 __pycache__/
