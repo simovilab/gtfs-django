@@ -17,135 +17,9 @@ from google.protobuf import json_format
 from gtfs.models import GTFSProvider, FeedMessage, VehiclePosition, TripUpdate, StopTimeUpdate, Alert
 from django.utils import timezone
 from django.utils.timezone import make_aware
-import unittest
-import json
-from google.transit import gtfs_realtime_pb2
-import pytz
 from django.core.cache import cache
 from google.protobuf.message import DecodeError
-
-
-class GTFSRealtimeTests(unittest.TestCase):
-    def setUp(self):
-        # Initialize test data with sample identifiers
-        self.test_data = {
-            'trip_id': '123',
-            'vehicle_id': '456',
-            'alert_id': '789',
-            'route_id': 'R001',
-            'stop_id': 'S001'
-        }
-        
-    def test_trip_update_serialization(self):
-        # Create test message with trip update data
-        feed = gtfs_realtime_pb2.FeedMessage()
-        entity = feed.entity.add()
-        trip_update = entity.trip_update
-        
-        # Configure basic trip information
-        trip_update.trip.trip_id = self.test_data['trip_id']
-        trip_update.trip.route_id = self.test_data['route_id']
-        
-        # Configure stop time update with delay
-        stop_time = trip_update.stop_time_update.add()
-        stop_time.stop_sequence = 1
-        stop_time.arrival.delay = 60  # 1 minute delay
-        
-        # Serialize message to binary format
-        serialized_data = feed.SerializeToString()
-        
-        # Deserialize and validate the message
-        parsed_feed = gtfs_realtime_pb2.FeedMessage()
-        parsed_feed.ParseFromString(serialized_data)
-        
-        # Verify trip update fields
-        self.assertEqual(parsed_feed.entity[0].trip_update.trip.trip_id,
-                        self.test_data['trip_id'])
-        self.assertEqual(parsed_feed.entity[0].trip_update.stop_time_update[0].stop_sequence,
-                        1)
-        self.assertEqual(parsed_feed.entity[0].trip_update.stop_time_update[0].arrival.delay,
-                        60)
-
-    def test_vehicle_position_serialization(self):
-        # Create test message with vehicle position data
-        feed = gtfs_realtime_pb2.FeedMessage()
-        entity = feed.entity.add()
-        vehicle_position = entity.vehicle
-        
-        # Configure vehicle identification and location
-        vehicle_position.vehicle.id = self.test_data['vehicle_id']
-        vehicle_position.position.latitude = 37.7749
-        vehicle_position.position.longitude = -122.4194
-        
-        # Serialize message to binary format
-        serialized_data = feed.SerializeToString()
-        
-        # Deserialize and validate the message
-        parsed_feed = gtfs_realtime_pb2.FeedMessage()
-        parsed_feed.ParseFromString(serialized_data)
-        
-        # Verify vehicle position fields
-        self.assertEqual(parsed_feed.entity[0].vehicle.vehicle.id,
-                        self.test_data['vehicle_id'])
-        self.assertAlmostEqual(parsed_feed.entity[0].vehicle.position.latitude,
-                             37.7749, places=4)
-        self.assertAlmostEqual(parsed_feed.entity[0].vehicle.position.longitude,
-                             -122.4194, places=4)
-
-    def test_alert_serialization(self):
-        # Create test message with alert data
-        feed = gtfs_realtime_pb2.FeedMessage()
-        entity = feed.entity.add()
-        alert = entity.alert
-        
-        # Configure alert translations
-        alert.header_text.translations.add(text='Test Alert')
-        alert.description_text.translations.add(text='Alert description')
-        
-        # Add affected entity information
-        informed_entity = alert.informed_entity.add()
-        informed_entity.route_id = self.test_data['route_id']
-        
-        # Serialize message to binary format
-        serialized_data = feed.SerializeToString()
-        
-        # Deserialize and validate the message
-        parsed_feed = gtfs_realtime_pb2.FeedMessage()
-        parsed_feed.ParseFromString(serialized_data)
-        
-        # Verify alert fields
-        self.assertEqual(parsed_feed.entity[0].alert.header_text.translations[0].text,
-                        'Test Alert')
-        self.assertEqual(parsed_feed.entity[0].alert.informed_entity[0].route_id,
-                        self.test_data['route_id'])
-
-    def test_feed_validation(self):
-        # Create valid message for testing
-        feed = gtfs_realtime_pb2.FeedMessage()
-        feed.header.gtfs_realtime_version = "2.0"
-        entity = feed.entity.add()
-        
-        # Validate valid message
-        self.assertTrue(self._validate_feed(feed))
-        
-        # Create invalid message (missing version)
-        invalid_feed = gtfs_realtime_pb2.FeedMessage()
-        
-        # Validate invalid message
-        self.assertFalse(self._validate_feed(invalid_feed))
-
-    def _validate_feed(self, feed):
-        # Check required GTFS Realtime fields
-        if not feed.header.gtfs_realtime_version:
-            return False
-        if not feed.entity:
-            return False
-        return True
-
-if __name__ == '__main__':
-    unittest.main()
-
-
+from django.core.exceptions import ValidationError
 
 
 def _format_time(dt):
@@ -155,119 +29,6 @@ def _format_time(dt):
     if hasattr(dt, "time"):
         dt = dt.time()
     return dt.strftime("%H:%M:%S")
-
-
-def get_vehicle_positions():
-    providers = GTFSProvider.objects.filter(is_active=True)
-    saved_data = False
-    for provider in providers:
-        vehicle_positions = gtfs_rt.FeedMessage()
-        try:
-            vehicle_positions_response = requests.get(provider.vehicle_positions_url)
-            print(f"Fetching vehicle positions from {provider.vehicle_positions_url}")
-        except requests.exceptions.RequestException as e:
-                # timeouts, DNS, HTTP errors
-                print(f"Network error fetching from {provider.vehicle_positions_url}: {e}")
-                continue
-
-        except DecodeError as e:
-            # decoding Protobuf error
-            print(f"Failed to parse Protobuf data from {provider.vehicle_positions_url}: {e}")
-            continue
-
-        except Exception as e:
-            # unexpected errors
-            print(f"Unexpected error processing {provider.code}: {e}")
-            continue
-        vehicle_positions.ParseFromString(vehicle_positions_response.content)
-
-        # Save feed message to database
-        feed_message = FeedMessage(
-            feed_message_id=f"{provider.code}-vehicle-{vehicle_positions.header.timestamp}",
-            provider=provider,
-            entity_type="vehicle",
-            timestamp=datetime.fromtimestamp(
-                int(vehicle_positions.header.timestamp),
-                tz=pytz.timezone(provider.timezone),
-            ),
-            incrementality=vehicle_positions.header.incrementality,
-            gtfs_realtime_version=vehicle_positions.header.gtfs_realtime_version,
-        )
-
-        feed_message.save()
-
-        vehicle_positions_json = json_format.MessageToJson(
-            vehicle_positions, preserving_proto_field_name=True
-        )
-        vehicle_positions_json = json.loads(vehicle_positions_json)
-        if "entity" not in vehicle_positions_json:
-            print("No vehicle positions found")
-            continue
-        vehicle_positions_df = pd.json_normalize(
-            vehicle_positions_json["entity"], sep="_"
-        )
-        vehicle_positions_df.rename(columns={"id": "entity_id"}, inplace=True)
-        vehicle_positions_df["feed_message"] = feed_message
-        # Drop unnecessary columns
-        try:
-            vehicle_positions_df.drop(
-                columns=["vehicle_multi_carriage_details"],
-                inplace=True,
-            )
-        except Exception:
-            pass
-        # Fix entity timestamp
-        vehicle_positions_df["vehicle_timestamp"] = pd.to_datetime(
-            vehicle_positions_df["vehicle_timestamp"].astype(int), unit="s", utc=True
-        )
-        # Fix trip start date
-        vehicle_positions_df["vehicle_trip_start_date"] = pd.to_datetime(
-            vehicle_positions_df["vehicle_trip_start_date"], format="%Y%m%d"
-        )
-        vehicle_positions_df["vehicle_trip_start_date"].fillna(
-            datetime.now().date(), inplace=True
-        )
-        # Fix trip start time
-        vehicle_positions_df["vehicle_trip_start_time"] = pd.to_timedelta(
-            vehicle_positions_df["vehicle_trip_start_time"]
-        )
-        vehicle_positions_df["vehicle_trip_start_time"].fillna(
-            timedelta(hours=0, minutes=0, seconds=0), inplace=True
-        )
-        # Fix trip direction
-        vehicle_positions_df["vehicle_trip_direction_id"].fillna(-1, inplace=True)
-        # Fix current stop sequence
-        vehicle_positions_df["vehicle_current_stop_sequence"].fillna(-1, inplace=True)
-        # Create vehicle position point
-        vehicle_positions_df["vehicle_position_point"] = vehicle_positions_df.apply(
-            lambda x: f"POINT ({x.vehicle_position_longitude} {x.vehicle_position_latitude})",
-            axis=1,
-        )
-        # Save to database
-        objects = [
-            VehiclePosition(**row)
-            for row in vehicle_positions_df.to_dict(orient="records")
-        ]
-        VehiclePosition.objects.bulk_create(objects)
-        saved_data = saved_data or True
-
-    # Send status update to WebSocket
-    message = {}
-    message["last_update"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    message["number_providers"] = len(providers)
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "status",
-        {
-            "type": "status_message",
-            "message": message,
-        },
-    )
-
-    if saved_data:
-        return "VehiclePositions saved to database"
-    else:
-        return "No VehiclePositions found"
 
 def build_vehicle_positions():
     """
@@ -887,3 +648,80 @@ def get_service_alerts():
         else:
             print("No ServiceAlerts found or decoded.")
             return "No ServiceAlerts found"
+class RealTimeValidator:
+    """Utility class for validating GTFS-Realtime feed batches."""
+    def validate_message_batch(messages):
+        """
+        Validates a list or queryset of FeedMessage objects for timestamp monotonicity.
+        Raises ValidationError if timestamps are not strictly increasing.
+        """
+        sorted_messages = sorted(messages, key=lambda x: x.timestamp)
+        for i in range(len(sorted_messages) - 1):
+            if sorted_messages[i].timestamp >= sorted_messages[i + 1].timestamp:
+                raise ValidationError(
+                    "Non-monotonic timestamps detected in message batch."
+                )
+        return True
+
+    def validate_timestamp_sequence(entity_type, message_ids):
+        """
+        Validates timestamp sequence for a specific entity type.
+
+        Args:
+            entity_type (str): 'trip_update', 'vehicle', or 'alert'.
+            message_ids (list[str]): List of FeedMessage IDs to check.
+
+        Raises:
+            ValidationError: If timestamps are non-monotonic.
+        """
+        messages = FeedMessage.objects.filter(
+            entity_type=entity_type,
+            feed_message_id__in=message_ids
+        ).order_by('timestamp')
+
+        for i in range(len(messages) - 1):
+            if messages[i].timestamp >= messages[i + 1].timestamp:
+                raise ValidationError(
+                    f"Non-monotonic timestamps found in {entity_type} sequence."
+                )
+        return True
+
+
+class JSONExporter:
+    """Utility class for converting FeedMessage or related entities into JSON."""
+
+    def export_to_json(queryset):
+        """
+        Converts a queryset of FeedMessage objects to JSON format.
+
+        Returns:
+            str: UTF-8 JSON string containing feed message data.
+        """
+        return json.dumps([
+            {
+                "type": "Feature",
+                "properties": {
+                    "feed_message_id": msg.feed_message_id,
+                    "timestamp": msg.timestamp.isoformat(),
+                    "entity_type": msg.entity_type,
+                    "data": msg.to_json(),
+                },
+            }
+            for msg in queryset
+        ], ensure_ascii=False, default=str)
+
+    def export_batch_to_json(messages):
+        """
+        Converts a list or queryset of FeedMessage objects to a GTFS-Realtime style JSON.
+
+        Returns:
+            str: JSON string with 'header' and 'entity' sections.
+        """
+        return json.dumps({
+            "header": {
+                "gtfs_realtime_version": "2.0",
+                "incrementality": "FULL_DATASET",
+                "timestamp": datetime.now().isoformat(),
+            },
+            "entity": [msg.to_json() for msg in messages],
+        }, ensure_ascii=False, default=str)

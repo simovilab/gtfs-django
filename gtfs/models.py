@@ -863,10 +863,39 @@ class FeedMessage(models.Model):
             models.Index(fields=["provider_id", "timestamp"]),
         ]
 
+    def clean(self):
+        """Model-level validation for timestamp monotonicity and ID consistency."""
+        # Timestamp monotonicity
+        previous = (
+            FeedMessage.objects.filter(feed_message_id=self.feed_message_id)
+            .exclude(pk=self.pk)
+            .order_by('-timestamp')
+            .first()
+        )
+        if previous and previous.timestamp >= self.timestamp:
+            raise ValidationError(
+                {"timestamp": "Timestamp must be greater than previous FeedMessage timestamp."}
+            )
+
+        # Identifier consistency
+        if self.entity_type == "trip_update" and not hasattr(self, "trip"):
+            raise ValidationError(
+                {"entity_type": "TripUpdate must have a valid trip reference."}
+            )
+
+    def to_json(self):
+        """Converts this model instance into a JSON-serializable dictionary."""
+        return {
+            "feed_message_id": self.feed_message_id,
+            "timestamp": self.timestamp.isoformat(),
+            "entity_type": self.entity_type,
+            "incrementality": self.incrementality,
+            "gtfs_realtime_version": self.gtfs_realtime_version,
+        }
+
     def __str__(self):
         return f"{self.entity_type} ({self.timestamp})"
-
-
+    
 class TripUpdate(models.Model):
     """
     GTFS Realtime TripUpdate entity v2.0 (normalized).
@@ -1080,7 +1109,7 @@ class Alert(models.Model):
     # Relation to Feed model
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
 
-    # ID aalert
+    # ID alert
     alert_id = models.CharField(
         max_length=255,
         help_text="Identificador único de la alerta (según FeedMessage.entity.id)."
