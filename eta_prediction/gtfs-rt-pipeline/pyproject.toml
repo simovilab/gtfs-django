@@ -12,6 +12,9 @@ dependencies = [
   "python-dotenv>=1.0",
   "requests>=2.32",
   "gtfs-realtime-bindings>=1.0.0",
+  "numpy>=2.3.4",
+  "pandas>=2.3.3",
+  "fastparquet>=2024.11.0",
 ]
 
 [project.optional-dependencies]
