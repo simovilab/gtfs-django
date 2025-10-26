@@ -16,7 +16,6 @@ dependencies = [
     "matplotlib>=3.9.4",
     "pandas>=2.3.3",
     "psycopg>=3.2.11",
-    "pytest>=8.4.2",
     "requests>=2.31",
 ]
 
