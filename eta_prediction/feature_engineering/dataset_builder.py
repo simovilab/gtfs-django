@@ -2,331 +2,373 @@ from __future__ import annotations
 
 from datetime import datetime, date, time, timedelta
 from typing import Optional, List
-
 import numpy as np
 import pandas as pd
+from math import radians, cos, sin, asin, sqrt
 
-from django.db.models import F, Q, OuterRef, Subquery, Exists, Prefetch
-from django.db.models.functions import Coalesce
-
+from django.db.models import F, Q
 from sch_pipeline.models import StopTime, Stop, Route, Trip
-from rt_pipeline.models import VehiclePosition, TripUpdate
-from sch_pipeline.utils import top_routes_by_scheduled_trips
-
+from rt_pipeline.models import VehiclePosition
 from feature_engineering.temporal import extract_temporal_features
 from feature_engineering.operational import calculate_headway, detect_congestion_proxy
 from feature_engineering.weather import fetch_weather
 
 
-def _parse_sched_time(val) -> Optional[int]:
+def haversine_distance(lat1, lon1, lat2, lon2):
     """
-    Normalize schedule arrival_time to seconds since midnight.
-    Accepts 'HH:MM:SS', integer seconds, or time object.
+    Calculate the great circle distance in meters between two points 
+    on the earth (specified in decimal degrees)
     """
-    if val is None or pd.isna(val):
+    # Convert decimal degrees to radians
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+    
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    r = 6371000  # Radius of earth in meters
+    return c * r
+
+
+def find_actual_arrival_time(vp_df_for_trip, stop_lat, stop_lon, distance_threshold=50):
+    """
+    Find the ts when a vehicle arrived at a stop.
+    
+    Strategy:
+    1. Calculate distance from each VP to the stop
+    2. Find the first VP within distance_threshold meters
+    3. Return its ts as arrival time
+    
+    Args:
+        vp_df_for_trip: DataFrame of VehiclePositions for a specific trip, sorted by ts
+        stop_lat: Stop lat
+        stop_lon: Stop lon
+        distance_threshold: Distance in meters to consider "arrived" (default 50m)
+    
+    Returns:
+        datetime or None if vehicle never arrived
+    """
+    if vp_df_for_trip.empty:
         return None
     
-    # If it's already an integer (seconds), return it
-    if isinstance(val, int):
-        return val
+    # Calculate distances to stop
+    distances = vp_df_for_trip.apply(
+        lambda row: haversine_distance(row['lat'], row['lon'], stop_lat, stop_lon),
+        axis=1
+    )
     
-    # If it's a time object
-    if isinstance(val, time):
-        return val.hour * 3600 + val.minute * 60 + val.second
+    # Find first position within threshold
+    arrived_mask = distances <= distance_threshold
+    if arrived_mask.any():
+        first_arrival_idx = arrived_mask.idxmax()  # First True index
+        return vp_df_for_trip.loc[first_arrival_idx, 'ts']
     
-    # If it's a timedelta (from GTFS sometimes)
-    if isinstance(val, timedelta):
-        return int(val.total_seconds())
+    # Alternative: If never within threshold, find closest approach
+    closest_idx = distances.idxmin()
+    min_distance = distances.min()
     
-    # If it's a string
-    if isinstance(val, str):
-        try:
-            parts = val.split(":")
-            hh, mm, ss = int(parts[0]), int(parts[1]), int(parts[2])
-            return hh * 3600 + mm * 60 + ss
-        except Exception:
-            return None
+    # Only use closest approach if reasonably close (e.g., within 200m)
+    if min_distance <= 200:
+        return vp_df_for_trip.loc[closest_idx, 'ts']
     
     return None
 
 
-def _yyyymmdd_to_date(s: Optional[str]) -> Optional[date]:
-    """Convert YYYYMMDD string or date object to date object."""
-    if not s or pd.isna(s):
-        return None
-    
-    # If it's already a date object, return it
-    if isinstance(s, date):
-        return s
-    
-    # If it's a datetime, extract the date
-    if isinstance(s, datetime):
-        return s.date()
-    
-    try:
-        s = str(s)
-        return date(int(s[0:4]), int(s[4:6]), int(s[6:8]))
-    except Exception:
-        return None
-
-
-def _mk_dt(d: Optional[date], seconds_since_midnight: Optional[int]) -> Optional[datetime]:
-    """Combine date and seconds to create datetime."""
-    if d is None or seconds_since_midnight is None:
-        return None
-    return datetime.combine(d, time(0, 0)) + timedelta(seconds=int(seconds_since_midnight))
-
-
-def build_training_dataset(
-    provider_id: Optional[int] = None,
+def build_vp_training_dataset(
     route_ids: Optional[List[str]] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    min_observations_per_stop: int = 30,
+    distance_threshold: float = 50.0,
+    max_stops_ahead: int = 5,
     attach_weather: bool = True,
     tz_for_temporal: str = "America/Costa_Rica",
 ) -> pd.DataFrame:
     """
-    Optimized pipeline using direct database join via raw SQL or simplified ORM.
+    Build training dataset from VehiclePosition data only.
     
-    Strategy:
-    1. Filter TripUpdates by date range FIRST (reduce dataset)
-    2. Get matching trip_ids for routes
-    3. Use a single query with proper joins instead of subqueries
-    4. Process in pandas for complex computations
+    For each VehiclePosition:
+    - Identify current trip and route
+    - Find remaining stops in trip
+    - Calculate distance to each remaining stop (up to max_stops_ahead)
+    - Find actual arrival times from subsequent VehiclePositions
+    - Extract temporal, operational, and weather features
+    
+    Args:
+        route_ids: List of route IDs to include (None = all routes)
+        start_date: Start of date range
+        end_date: End of date range
+        distance_threshold: Distance in meters to consider "arrived at stop"
+        max_stops_ahead: Maximum number of future stops to include per VP
+        attach_weather: Whether to fetch weather data
+        tz_for_temporal: Timezone for temporal features
+    
+    Returns:
+        DataFrame with columns:
+        - trip_id, route_id, vehicle_id
+        - vp_ts, vp_lat, vp_lon
+        - stop_id, stop_sequence, stop_lat, stop_lon
+        - distance_to_stop (meters)
+        - scheduled_arrival, actual_arrival, delay_seconds
+        - temporal features (hour, day_of_week, etc.)
+        - operational features (headway, avg_speed)
+        - weather features (temperature, precipitation, wind_speed)
     """
-
+    
     print("=" * 70)
-    print("OPTIMIZED DATASET BUILDER")
+    print("VP-BASED DATASET BUILDER")
     print("=" * 70)
     
     # ============================================================
-    # STEP 1: Filter TripUpdates first (reduce data volume)
+    # STEP 1: Fetch VehiclePositions
     # ============================================================
-    print("\nStep 1: Building TripUpdate filter...")
+    print("\nStep 1: Fetching VehiclePositions...")
     
-    tu_qs = TripUpdate.objects.all()
+    vp_qs = VehiclePosition.objects.exclude(
+        Q(trip_id__isnull=True) |
+        Q(lat__isnull=True) |
+        Q(lon__isnull=True)
+    )
     
-    # Date range filter
     if start_date:
         print(f"  Filtering start_date >= {start_date}")
-        tu_qs = tu_qs.filter(ts__gte=start_date)
+        vp_qs = vp_qs.filter(ts__gte=start_date)
     
     if end_date:
         print(f"  Filtering end_date < {end_date}")
-        tu_qs = tu_qs.filter(ts__lt=end_date)
+        vp_qs = vp_qs.filter(ts__lt=end_date)
     
-    # Must have essential fields
-    tu_qs = tu_qs.exclude(
-        Q(trip_id__isnull=True) | 
-        Q(stop_sequence__isnull=True) |
-        Q(start_date__isnull=True)
-    )
-    
-    print(f"  TripUpdates matching date range: {tu_qs.count():,}")
-    
-    # ============================================================
-    # STEP 2: Get trip_ids for specified routes
-    # ============================================================
+    # Filter by route if specified
     if route_ids:
-        print(f"\nStep 2: Filtering for routes: {route_ids}")
+        print(f"  Filtering for routes: {route_ids}")
         trip_ids_for_routes = list(
             Trip.objects.filter(route_id__in=route_ids)
             .values_list("trip_id", flat=True)
         )
-        print(f"  Found {len(trip_ids_for_routes):,} trips for these routes")
-        
-        # Filter TripUpdates to only these trips
-        tu_qs = tu_qs.filter(trip_id__in=trip_ids_for_routes)
-        print(f"  TripUpdates for these routes: {tu_qs.count():,}")
+        vp_qs = vp_qs.filter(trip_id__in=trip_ids_for_routes)
     
-    # ============================================================
-    # STEP 3: Get TripUpdate data (deduplicated)
-    # ============================================================
-    print("\nStep 3: Fetching TripUpdate data...")
-    
-    # Get latest update per (trip_id, stop_sequence)
-    # We'll deduplicate in pandas since Django ORM doesn't have good window functions
-    tu_data = tu_qs.values(
+    print(f"  Fetching VehiclePosition records...")
+    vp_data = vp_qs.values(
         'trip_id',
-        'stop_sequence',
-        'arrival_time',
-        'departure_time',
+        'vehicle_id',
         'ts',
-        'start_date',
-        'stop_id',
-    ).order_by('trip_id', 'stop_sequence', '-ts')
+        'lat',
+        'lon',
+        'bearing',
+        'speed',
+    ).order_by('trip_id', 'ts')
     
-    print(f"  Fetching TripUpdate records...")
-    tu_df = pd.DataFrame.from_records(tu_data)
-    print(f"  Retrieved {len(tu_df):,} TripUpdate records")
+    vp_df = pd.DataFrame.from_records(vp_data)
+    print(f"  Retrieved {len(vp_df):,} VehiclePosition records")
     
-    if tu_df.empty:
-        print("\nWARNING: No TripUpdate data found!")
+    if vp_df.empty:
+        print("\nWARNING: No VehiclePosition data found!")
         return pd.DataFrame()
     
-    # Deduplicate: keep latest update per (trip_id, stop_sequence)
-    print("  Deduplicating TripUpdates (keeping latest per trip/stop)...")
-    tu_df = tu_df.drop_duplicates(subset=['trip_id', 'stop_sequence'], keep='first')
-    print(f"  After deduplication: {len(tu_df):,} records")
+    # ============================================================
+    # STEP 2: Get trip metadata
+    # ============================================================
+    print("\nStep 2: Getting trip metadata...")
     
-    # Rename for clarity
-    tu_df = tu_df.rename(columns={
-        'arrival_time': 'tu_arrival',
-        'departure_time': 'tu_departure',
-        'ts': 'tu_ts',
-        'start_date': 'tu_start_date',
-        'stop_id': 'tu_stop_id',
-    })
+    trip_ids = vp_df['trip_id'].unique()
+    trips_data = Trip.objects.filter(trip_id__in=trip_ids).values(
+        'trip_id', 'route_id', 'direction_id', 'trip_headsign', 'service_id'
+    )
+    trips_df = pd.DataFrame.from_records(trips_data)
+    
+    vp_df = vp_df.merge(trips_df, on='trip_id', how='left')
+    print(f"  Added route info for {len(vp_df):,} records")
+    
+    # Drop VPs without route info
+    initial_count = len(vp_df)
+    vp_df = vp_df.dropna(subset=['route_id'])
+    print(f"  Dropped {initial_count - len(vp_df):,} VPs without route info")
     
     # ============================================================
-    # STEP 4: Get StopTime data for matching trips
+    # STEP 3: Get stop sequences for each trip
     # ============================================================
-    print("\nStep 4: Fetching StopTime schedule data...")
+    print("\nStep 3: Loading stop sequences for trips...")
     
-    # Get unique trip_ids from TripUpdates
-    trip_ids = tu_df['trip_id'].unique()
-    print(f"  Unique trips to fetch: {len(trip_ids):,}")
-    
-    # Fetch StopTimes for these trips
-    st_qs = StopTime.objects.filter(trip_id__in=trip_ids)
-    
-    st_data = st_qs.values(
+    stoptimes_data = StopTime.objects.filter(
+        trip_id__in=trip_ids
+    ).values(
         'trip_id',
         'stop_sequence',
         'stop_id',
         'arrival_time',
-        'departure_time',
-    )
+    ).order_by('trip_id', 'stop_sequence')
     
-    print(f"  Fetching StopTime records...")
-    st_df = pd.DataFrame.from_records(st_data)
+    st_df = pd.DataFrame.from_records(stoptimes_data)
     print(f"  Retrieved {len(st_df):,} StopTime records")
     
     if st_df.empty:
         print("\nWARNING: No StopTime data found!")
         return pd.DataFrame()
     
-    # ============================================================
-    # STEP 5: Join StopTime + TripUpdate
-    # ============================================================
-    print("\nStep 5: Joining schedule and realtime data...")
+    # # Get stop coordinates
+    # stop_ids = st_df['stop_id'].unique()
+    # stops_data = Stop.objects.filter(id__in=stop_ids).values(
+    #     'id', 'stop_lat', 'stop_lon', 'stop_name'
+    # )
+    # stops_df = pd.DataFrame.from_records(stops_data).rename(
+    #     columns={'id': 'stop_id'}
+    # )
     
-    df = st_df.merge(
-        tu_df,
-        on=['trip_id', 'stop_sequence'],
-        how='inner',  # Only keep records with both schedule and realtime data
-        suffixes=('_sched', '_tu')
+    # st_df = st_df.merge(stops_df, on='stop_id', how='left')
+    # print(f"  Added coordinates for {st_df['stop_lat'].notna().sum():,} stops")
+    
+    # Get stop coordinates
+    stop_ids = st_df['stop_id'].unique()
+    # remove any NaN / None values and coerce to list for ORM filter
+    stop_ids = [s for s in stop_ids if pd.notna(s)]
+    stops_data = Stop.objects.filter(id__in=stop_ids).values(
+        'id', 'stop_lat', 'stop_lon', 'stop_name'
     )
+    stops_df = pd.DataFrame.from_records(stops_data).rename(
+        columns={'id': 'stop_id'}
+    )
+    # use the model column that stores GTFS stop id (stop_id) so values() returns 'stop_id'
+    stops_data = Stop.objects.filter(stop_id__in=stop_ids).values(
+        'stop_id', 'stop_lat', 'stop_lon', 'stop_name'
+    )
+    stops_df = pd.DataFrame.from_records(stops_data)
+
+    st_df = st_df.merge(stops_df, on='stop_id', how='left')
+    print(f"  Added coordinates for {st_df['stop_lat'].notna().sum():,} stops")
+    # st_df = st_df.merge(stops_df, on='stop_id', how='left')
+    # print(f"  Added coordinates for {st_df['stop_lat'].notna().sum():,} stops")
+# ...existing code...
+
+
+    # ============================================================
+    # STEP 4: For each VP, find remaining stops and distances
+    # ============================================================
+    print(f"\nStep 4: Calculating distances to remaining stops (max {max_stops_ahead})...")
     
-    print(f"  After join: {len(df):,} records")
+    training_rows = []
+    total_vps = len(vp_df)
     
-    if df.empty:
-        print("\nWARNING: No matching records after join!")
+    # Group VPs by trip for efficient processing
+    vp_grouped = vp_df.groupby('trip_id')
+    st_grouped = st_df.groupby('trip_id')
+    
+    processed_trips = 0
+    for trip_id, trip_vps in vp_grouped:
+        processed_trips += 1
+        if processed_trips % 100 == 0:
+            print(f"  Processing trip {processed_trips}/{len(vp_grouped)} ({len(training_rows):,} rows generated)")
+        
+        # Get stop sequence for this trip
+        if trip_id not in st_grouped.groups:
+            continue
+        
+        trip_stops = st_grouped.get_group(trip_id).sort_values('stop_sequence')
+        
+        # For each VP in this trip
+        for vp_idx, vp_row in trip_vps.iterrows():
+            vp_lat = vp_row['lat']
+            vp_lon = vp_row['lon']
+            vp_ts = vp_row['ts']
+            
+            # Find which stops are ahead of this VP
+            # Strategy: Calculate distance to all stops, take the closest N
+            distances_to_stops = trip_stops.apply(
+                lambda stop: haversine_distance(vp_lat, vp_lon, stop['stop_lat'], stop['stop_lon']),
+                axis=1
+            )
+            
+            trip_stops_with_dist = trip_stops.copy()
+            trip_stops_with_dist['distance_to_stop'] = distances_to_stops
+            
+            # Sort by stop_sequence and take upcoming stops
+            # A stop is "upcoming" if it hasn't been passed yet
+            # Simple heuristic: stops that are ahead in sequence from the closest stop
+            closest_stop_idx = distances_to_stops.idxmin()
+            closest_stop_seq = trip_stops.loc[closest_stop_idx, 'stop_sequence']
+            
+            # Get stops with sequence >= closest (upcoming stops)
+            upcoming_stops = trip_stops_with_dist[
+                trip_stops_with_dist['stop_sequence'] >= closest_stop_seq
+            ].head(max_stops_ahead)
+            
+            # For each upcoming stop, find actual arrival time
+            for stop_idx, stop_row in upcoming_stops.iterrows():
+                # Find actual arrival from future VPs
+                future_vps = trip_vps[trip_vps['ts'] > vp_ts]
+                
+                actual_arrival = find_actual_arrival_time(
+                    future_vps,
+                    stop_row['stop_lat'],
+                    stop_row['stop_lon'],
+                    distance_threshold=distance_threshold
+                )
+                
+                # Only include if we found an actual arrival
+                if actual_arrival is not None:
+                    training_rows.append({
+                        'trip_id': trip_id,
+                        'route_id': vp_row['route_id'],
+                        'vehicle_id': vp_row['vehicle_id'],
+                        'vp_ts': vp_ts,
+                        'vp_lat': vp_lat,
+                        'vp_lon': vp_lon,
+                        'vp_bearing': vp_row.get('bearing'),
+                        'vp_speed': vp_row.get('speed'),
+                        'stop_id': stop_row['stop_id'],
+                        'stop_sequence': stop_row['stop_sequence'],
+                        'stop_lat': stop_row['stop_lat'],
+                        'stop_lon': stop_row['stop_lon'],
+                        'distance_to_stop': stop_row['distance_to_stop'],
+                        'scheduled_arrival': stop_row['arrival_time'],
+                        'actual_arrival': actual_arrival,
+                    })
+    
+    print(f"  Generated {len(training_rows):,} training samples")
+    
+    if not training_rows:
+        print("\nWARNING: No training rows generated!")
         return pd.DataFrame()
     
-    # ============================================================
-    # STEP 6: Get Trip/Route metadata
-    # ============================================================
-    print("\nStep 6: Adding route information...")
-    
-    trip_ids = df['trip_id'].unique()
-    trips_data = Trip.objects.filter(trip_id__in=trip_ids).values(
-        'trip_id', 'route_id', 'direction_id', 'trip_headsign'
-    )
-    trips_df = pd.DataFrame.from_records(trips_data)
-    
-    df = df.merge(trips_df, on='trip_id', how='left')
-    print(f"  Added route_id for {len(df):,} records")
+    df = pd.DataFrame(training_rows)
     
     # ============================================================
-    # STEP 7: Compute scheduled and actual arrival times
+    # STEP 5: Compute delay_seconds
     # ============================================================
-    print("\nStep 7: Computing scheduled_arrival...")
+    print("\nStep 5: Computing delay_seconds...")
     
-    # Debug: Check what we have
-    print(f"  Sample arrival_time values: {df['arrival_time'].head().tolist()}")
-    print(f"  Sample arrival_time types: {[type(x) for x in df['arrival_time'].head().tolist()]}")
-    print(f"  Sample tu_start_date values: {df['tu_start_date'].head().tolist()}")
-    print(f"  Sample tu_start_date types: {[type(x) for x in df['tu_start_date'].head().tolist()]}")
+    # Convert tss to datetime
+    df['vp_ts'] = pd.to_datetime(df['vp_ts'], utc=True)
+    df['actual_arrival'] = pd.to_datetime(df['actual_arrival'], utc=True)
     
-    df["sched_secs"] = df["arrival_time"].apply(_parse_sched_time)
-    df["start_date_obj"] = df["tu_start_date"].apply(_yyyymmdd_to_date)
-    
-    print(f"  Parsed sched_secs (non-null): {df['sched_secs'].notna().sum()}/{len(df)}")
-    print(f"  Parsed start_date_obj (non-null): {df['start_date_obj'].notna().sum()}/{len(df)}")
-    print(f"  Sample sched_secs: {df['sched_secs'].head().tolist()}")
-    print(f"  Sample start_date_obj: {df['start_date_obj'].head().tolist()}")
-    
-    # Check if both are present before combining
-    both_valid = (df['sched_secs'].notna() & df['start_date_obj'].notna()).sum()
-    print(f"  Rows with BOTH sched_secs AND start_date_obj: {both_valid}/{len(df)}")
-    
-    df["scheduled_arrival"] = df.apply(
-        lambda row: _mk_dt(row["start_date_obj"], row["sched_secs"]),
-        axis=1
-    )
-    
-    print(f"  Scheduled arrivals (non-null): {df['scheduled_arrival'].notna().sum()}/{len(df)}")
-    print(f"  Sample scheduled_arrival: {df['scheduled_arrival'].head().tolist()}")
-    
-    print("\nStep 8: Computing actual_arrival...")
-    print(f"  Sample tu_arrival: {df['tu_arrival'].head().tolist()}")
-    print(f"  Sample tu_departure: {df['tu_departure'].head().tolist()}")
-    print(f"  Sample tu_ts: {df['tu_ts'].head().tolist()}")
-    print(f"  tu_arrival (non-null): {df['tu_arrival'].notna().sum()}/{len(df)}")
-    print(f"  tu_departure (non-null): {df['tu_departure'].notna().sum()}/{len(df)}")
-    print(f"  tu_ts (non-null): {df['tu_ts'].notna().sum()}/{len(df)}")
-    
-    df["actual_arrival"] = df["tu_arrival"].combine_first(
-        df["tu_departure"]
-    ).combine_first(df["tu_ts"])
-    
-    print(f"  Actual arrivals (non-null): {df['actual_arrival'].notna().sum()}/{len(df)}")
-    print(f"  Sample actual_arrival: {df['actual_arrival'].head().tolist()}")
-    
-    # Ensure datetime dtype
-    for col in ["scheduled_arrival", "actual_arrival"]:
-        df[col] = pd.to_datetime(df[col], utc=True, errors="coerce")
-    
-    print(f"\n  After pd.to_datetime conversion:")
-    print(f"  Scheduled arrivals (non-null): {df['scheduled_arrival'].notna().sum()}/{len(df)}")
-    print(f"  Actual arrivals (non-null): {df['actual_arrival'].notna().sum()}/{len(df)}")
-    
-    # ============================================================
-    # STEP 9: Compute delay
-    # ============================================================
-    print("\nStep 9: Computing delay_seconds...")
-    df["delay_seconds"] = (
-        df["actual_arrival"] - df["scheduled_arrival"]
+    # Parse scheduled arrival time (may need date context)
+    # For now, compute time_to_arrival (prediction target)
+    df['time_to_arrival_seconds'] = (
+        df['actual_arrival'] - df['vp_ts']
     ).dt.total_seconds()
     
-    # Drop rows with missing critical data
+    # Filter out negative or unrealistic values
     initial_count = len(df)
-    df = df.dropna(subset=["scheduled_arrival", "actual_arrival", "delay_seconds"])
-    print(f"  Dropped {initial_count - len(df):,} rows with missing critical data")
+    df = df[
+        (df['time_to_arrival_seconds'] >= 0) &
+        (df['time_to_arrival_seconds'] <= 7200)  # Max 2 hours ahead
+    ]
+    print(f"  Dropped {initial_count - len(df):,} rows with invalid time_to_arrival")
     print(f"  Remaining: {len(df):,} rows")
     
-    if df.empty:
-        print("\nWARNING: All rows dropped due to missing data")
-        return df
+    # ============================================================
+    # STEP 6: Temporal features
+    # ============================================================
+    print("\nStep 6: Extracting temporal features...")
     
-    # ============================================================
-    # STEP 10: Temporal features
-    # ============================================================
-    print("\nStep 10: Extracting temporal features...")
     temporal_data = []
-    for idx, ts in enumerate(df["actual_arrival"]):
+    for idx, ts in enumerate(df['vp_ts']):
         if idx % 10000 == 0 and idx > 0:
             print(f"  Processed {idx:,}/{len(df):,} temporal features")
         
-        if pd.notna(ts):
-            try:
-                feats = extract_temporal_features(ts, tz=tz_for_temporal, region="CR")
-                temporal_data.append(feats)
-            except Exception as e:
-                temporal_data.append({})
-        else:
+        try:
+            feats = extract_temporal_features(ts, tz=tz_for_temporal, region="CR")
+            temporal_data.append(feats)
+        except Exception:
             temporal_data.append({})
     
     tf = pd.DataFrame(temporal_data)
@@ -338,78 +380,54 @@ def build_training_dataset(
             df[k] = np.nan
     
     # ============================================================
-    # STEP 11: Operational features
+    # STEP 7: Operational features
     # ============================================================
-    print("\nStep 11: Computing operational features...")
+    print("\nStep 7: Computing operational features...")
     
-    def _safe_headway(route_id, timestamp):
+    def _safe_headway(route_id, ts, vehicle_id):
         try:
             return calculate_headway(
                 route_id=route_id,
-                timestamp=timestamp,
-                vehicle_id=None
+                ts=ts,
+                vehicle_id=vehicle_id
             )
-        except Exception:
-            return np.nan
-    
-    def _safe_congestion(route_id, stop_sequence, timestamp):
-        try:
-            result = detect_congestion_proxy(
-                route_id=route_id,
-                stop_sequence=stop_sequence,
-                timestamp=timestamp,
-            )
-            return result.get("avg_speed_last_10min", np.nan) if result else np.nan
         except Exception:
             return np.nan
     
     headways = []
-    speeds = []
     for idx, row in df.iterrows():
-        if idx % 50 == 0:
-            print(f"  Processing operational features: {idx:,}/{len(df):,}")
-        headways.append(_safe_headway(row["route_id"], row["actual_arrival"]))
-        speeds.append(_safe_congestion(row["route_id"], row["stop_sequence"], row["actual_arrival"]))
+        if idx % 1000 == 0:
+            print(f"  Processing headway: {idx:,}/{len(df):,}")
+        headways.append(_safe_headway(
+            row['route_id'],
+            row['vp_ts'],
+            row['vehicle_id']
+        ))
     
-    df["headway_seconds"] = headways
-    df["avg_speed_last_10min"] = speeds
+    df['headway_seconds'] = headways
     
+    # Use VP speed directly if available
+    df['current_speed_kmh'] = df['vp_speed'] * 3.6  # m/s to km/h
     
     # ============================================================
-    # STEP 12: Weather features
+    # STEP 8: Weather features
     # ============================================================
     if attach_weather:
-        print("\nStep 12: Fetching weather data...")
-        
-        # Use tu_stop_id (from realtime) or stop_id (from schedule)
-        df['final_stop_id'] = df['tu_stop_id'].combine_first(df['stop_id'])
-        
-        stop_ids = df["final_stop_id"].unique()
-        stop_meta = Stop.objects.filter(
-            id__in=stop_ids
-        ).values("id", "stop_lat", "stop_lon")
-        stop_df = pd.DataFrame.from_records(stop_meta).rename(
-            columns={"id": "final_stop_id"}
-        )
-        
-        df = df.merge(stop_df, on="final_stop_id", how="left")
+        print("\nStep 8: Fetching weather data...")
         
         weather_data = []
         for idx, row in df.iterrows():
             if idx % 5000 == 0:
                 print(f"  Fetching weather: {idx:,}/{len(df):,}")
             
-            if pd.notna(row.get("stop_lat")) and pd.notna(row.get("stop_lon")) and pd.notna(row.get("actual_arrival")):
-                try:
-                    w = fetch_weather(
-                        float(row["stop_lat"]),
-                        float(row["stop_lon"]),
-                        pd.Timestamp(row["actual_arrival"]).to_pydatetime()
-                    )
-                    weather_data.append(w or {})
-                except Exception:
-                    weather_data.append({})
-            else:
+            try:
+                w = fetch_weather(
+                    float(row['vp_lat']),
+                    float(row['vp_lon']),
+                    row['vp_ts'].to_pydatetime()
+                )
+                weather_data.append(w or {})
+            except Exception:
                 weather_data.append({})
         
         wx_df = pd.DataFrame(weather_data)
@@ -424,41 +442,17 @@ def build_training_dataset(
         df["wind_speed_kmh"] = np.nan
     
     # ============================================================
-    # STEP 13: Outlier filtering
+    # STEP 9: Final column selection
     # ============================================================
-    # print("\nStep 13: Filtering outliers...")
-    # initial_count = len(df)
-    
-    # # Clip extreme delays (±2 hours)
-    # df = df[(df["delay_seconds"] >= -7200) & (df["delay_seconds"] <= 7200)]
-    # print(f"  Dropped {initial_count - len(df):,} outlier rows")
-    
-    # ============================================================
-    # STEP 14: Minimum observations per stop
-    # ============================================================
-    print(f"\nStep 14: Filtering stops with < {min_observations_per_stop} observations...")
-    
-    df['final_stop_id'] = df['tu_stop_id'].combine_first(df['stop_id'])
-    counts = df.groupby("final_stop_id").size()
-    keep_stops = set(counts[counts >= min_observations_per_stop].index)
-    
-    initial_count = len(df)
-    df = df[df["final_stop_id"].isin(keep_stops)]
-    print(f"  Kept {len(keep_stops)} stops, dropped {initial_count - len(df):,} rows")
-    
-    # ============================================================
-    # STEP 15: Final column selection
-    # ============================================================
-    print("\nStep 15: Preparing final dataset...")
-    
-    # Use tu_stop_id preferentially, fallback to schedule stop_id
-    df['stop_id'] = df['tu_stop_id'].combine_first(df['stop_id'])
+    print("\nStep 9: Preparing final dataset...")
     
     wanted_cols = [
-        "trip_id", "route_id", "stop_id", "stop_sequence",
-        "scheduled_arrival", "actual_arrival", "delay_seconds",
+        "trip_id", "route_id", "vehicle_id", "stop_id", "stop_sequence",
+        "vp_ts", "vp_lat", "vp_lon", "vp_bearing",
+        "stop_lat", "stop_lon", "distance_to_stop",
+        "actual_arrival", "time_to_arrival_seconds",
         "hour", "day_of_week", "is_weekend", "is_holiday", "is_peak_hour",
-        "headway_seconds", "avg_speed_last_10min",
+        "headway_seconds", "current_speed_kmh",
         "temperature_c", "precipitation_mm", "wind_speed_kmh",
     ]
     
@@ -470,6 +464,10 @@ def build_training_dataset(
     
     print("\n" + "=" * 70)
     print(f"✓ Final dataset: {len(result):,} rows × {len(wanted_cols)} columns")
+    print(f"  Unique trips: {result['trip_id'].nunique():,}")
+    print(f"  Unique routes: {result['route_id'].nunique():,}")
+    print(f"  Unique stops: {result['stop_id'].nunique():,}")
+    print(f"  Avg time_to_arrival: {result['time_to_arrival_seconds'].mean():.1f}s ({result['time_to_arrival_seconds'].mean()/60:.1f} min)")
     print("=" * 70)
     
     return result
