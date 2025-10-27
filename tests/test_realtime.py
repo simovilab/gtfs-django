@@ -1,9 +1,10 @@
 import unittest
 import os
+import json
 from google.transit import gtfs_realtime_pb2
 from google.protobuf import json_format
-
-
+from gtfs.utils import realtime
+from google.transit import gtfs_realtime_pb2 as gtfs_rt
 
 
 class GTFSRealtimeTests(unittest.TestCase):
@@ -101,6 +102,37 @@ class GTFSRealtimeTests(unittest.TestCase):
             return False
         return True
 
+    # ---------------- Bytewax TripUpdates Builder Test ----------------
+    def test_build_trip_updates_bytewax(self):
+        """
+        Validates that the Bytewax TripUpdates builder runs and produces valid GTFS-RT output.
+        """
+        result = realtime.build_trip_updates_bytewax()
+        self.assertIn("TripUpdates feed built successfully", result)
+
+        # Check files created
+        json_path = "feed/files/trip_updates_bytewax.json"
+        pb_path = "feed/files/trip_updates_bytewax.pb"
+        self.assertTrue(os.path.exists(json_path))
+        self.assertTrue(os.path.exists(pb_path))
+
+        # Validate JSON structure
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        self.assertIn("header", data)
+        self.assertIn("entity", data)
+        self.assertEqual(data["header"]["gtfs_realtime_version"], "2.0")
+        self.assertIsInstance(data["entity"], list)
+        self.assertGreater(len(data["entity"]), 0)
+
+        # Validate protobuf
+        with open(pb_path, "rb") as f:
+            content = f.read()
+        feed = gtfs_rt.FeedMessage()
+        feed.ParseFromString(content)
+        self.assertEqual(feed.header.gtfs_realtime_version, "2.0")
+        self.assertGreater(len(feed.entity), 0)
+
     # ---------------- Generate Sample Binaries ----------------
     @staticmethod
     def save_sample_binaries():
@@ -133,38 +165,11 @@ class GTFSRealtimeTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-
-
-    # 1️ Generate sample binary files
+    # Generate sample binaries for manual validation
     GTFSRealtimeTests.save_sample_binaries()
 
-    # 2️ Read and decode sample binary files
-    sample_files = [
-        "tests/data/trip_update.bin",
-        "tests/data/vehicle_position.bin",
-        "tests/data/alert.bin",
-    ]
-
-    print("\n==========================")
-    print("DECODIFICACIÓN DE GTFS-RT BINARIOS")
-    print("==========================\n")
-
-    for filepath in sample_files:
-        if not os.path.exists(filepath):
-            print(f"Archivo no encontrado: {filepath}")
-            continue
-
-        feed = gtfs_realtime_pb2.FeedMessage()
-        with open(filepath, "rb") as f:
-            feed.ParseFromString(f.read())
-
-        json_text = json_format.MessageToJson(feed, indent=2)
-        print(f"\n Archivo: {filepath}\n")
-        print(json_text)
-        print("\n" + "-" * 60)
-
-    # 3️ Execute unit tests
     print("\n==========================")
     print("EJECUTANDO UNIT TESTS")
     print("==========================\n")
     unittest.main()
+
