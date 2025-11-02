@@ -123,6 +123,28 @@ nearby_stops = Stop.objects.filter(
 )
 ```
 
+## 🧩 GTFS Schedule — Admin & Query Patterns (no composite PKs)
+
+### 🎯 Context
+En esta versión del módulo `gtfs.schedule`, por consejo de Fabian Abarca, se decidió **no usar composite primary keys (CPKs)** debido a las limitaciones de Django Admin y las complejidades al definir ForeignKeys y relaciones. Cada entidad mantiene una clave primaria simple (`id` o  `<entity>_id`).
+
+---
+
+### 🧱 Model Hierarchy
+```text
+FeedInfoSchedule
+ ├── AgencySchedule
+ │    └── RouteSchedule
+ │          └── TripSchedule
+ │                ├── StopTimeSchedule
+ │                └── ShapeSchedule
+ └── CalendarSchedule
+       └── CalendarDateSchedule
+
+
+
+
+
 ### Processing GTFS Realtime Data
 
 ```python

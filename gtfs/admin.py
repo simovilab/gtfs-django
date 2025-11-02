@@ -52,3 +52,28 @@ admin.site.register(FeedMessage)
 admin.site.register(TripUpdate)
 admin.site.register(StopTimeUpdate)
 admin.site.register(VehiclePosition, admin.GISModelAdmin)
+
+
+
+#GTFS Schedule implementation
+from .models_schedule import (
+    FeedInfoSchedule,
+    AgencySchedule,
+    RouteSchedule,
+    CalendarSchedule,
+    TripSchedule,
+    StopSchedule,
+    StopTimeSchedule,
+    ShapeSchedule,
+    CalendarDateSchedule,
+)
+
+admin.site.register(FeedInfoSchedule)
+admin.site.register(AgencySchedule)
+admin.site.register(RouteSchedule)
+admin.site.register(CalendarSchedule)
+admin.site.register(TripSchedule)
+admin.site.register(StopSchedule)
+admin.site.register(StopTimeSchedule)
+admin.site.register(ShapeSchedule)
+admin.site.register(CalendarDateSchedule)
