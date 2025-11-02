@@ -2,19 +2,19 @@
   "header": {
     "gtfs_realtime_version": "2.0",
     "incrementality": "FULL_DATASET",
-    "timestamp": 1761542010
+    "timestamp": 1762123434
   },
   "entity": [
     {
       "id": "trip_FAKE_TRIP_001",
       "trip_update": {
-        "timestamp": 1761542010,
+        "timestamp": 1762123434,
         "trip": {
           "trip_id": "FAKE_TRIP_001",
           "route_id": "FAKE_ROUTE_1",
           "direction_id": 0,
-          "start_time": "05:13:30",
-          "start_date": "20251027",
+          "start_time": "22:43:54",
+          "start_date": "20251102",
           "schedule_relationship": "SCHEDULED"
         },
         "vehicle": {
@@ -26,19 +26,19 @@
           {
             "stop_id": "STOP_A",
             "arrival": {
-              "time": 1761542194
+              "time": 1762123638
             }
           },
           {
             "stop_id": "STOP_B",
             "arrival": {
-              "time": 1761542166
+              "time": 1762123622
             }
           },
           {
             "stop_id": "STOP_C",
             "arrival": {
-              "time": 1761542155
+              "time": 1762123633
             }
           }
         ]
