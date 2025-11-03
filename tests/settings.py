@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "test-secret-key"
 DEBUG = True
@@ -17,8 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Enable GeoDjango if requested (default off to avoid system deps for unit tests)
-    *(["django.contrib.gis"] if os.getenv("USE_GIS", "0") == "1" else []),
+    "django.contrib.gis",  # activado directamente para PostGIS
     "gtfs",
 ]
 
@@ -46,26 +45,24 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
             ],
         },
-    }
+    },
 ]
 
 STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Database: default to SQLite for unit tests; allow GIS backends via env
-if os.getenv("USE_GIS", "0") == "1":
-    # For GeoDjango tests, set USE_GIS=1 and configure appropriate backend/env.
+# ==============================
+# Database (PostGIS / SQLite)
+# ==============================
+if os.getenv("USE_GIS", "1") == "1":
     DATABASES = {
         "default": {
-            "ENGINE": os.getenv(
-                "DJANGO_DB_ENGINE",
-                "django.contrib.gis.db.backends.postgis",
-            ),
-            "NAME": os.getenv("POSTGRES_DB", "gtfs_test"),
-            "USER": os.getenv("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
-            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-            "PORT": int(os.getenv("POSTGRES_PORT", "5432")),
+            "ENGINE": "django.contrib.gis.db.backends.postgis",
+            "NAME": "gtfs_test",
+            "USER": "gepacam",
+            "PASSWORD": "gepacam",
+            "HOST": "localhost",
+            "PORT": "5432",
         }
     }
 else:
@@ -75,3 +72,5 @@ else:
             "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
         }
     }
+
+SPATIALITE_LIBRARY_PATH = "mod_spatialite"
