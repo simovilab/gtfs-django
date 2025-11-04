@@ -1,11 +1,18 @@
+# Note: Composite Primary Keys intentionally omitted for admin and ORM compatibility. 
+# Uniqueness enforced via unique_together constraints per GTFS spec.
+# Query pattern example:
+# StopTimeSchedule.objects.filter(trip__trip_id="T001").order_by("stop_sequence")
+
+
 """
 GTFS Schedule v2.0 — Authoritative Django Models
 Generated from schedule.json schema.
 Compatible with Django 5.2 / SQLite backend (non-GIS).
 """
 
-from django.db import models
 
+
+from django.db import models
 
 # ==============================================================
 # AGENCY
@@ -82,8 +89,13 @@ class CalendarSchedule(models.Model):
 # CALENDAR DATES
 # ==============================================================
 class CalendarDateSchedule(models.Model):
+    """
+    GTFS entity: calendar_dates.txt
+    Composite PK (service_id, date) intentionally replaced by unique_together
+    to preserve Django Admin and ForeignKey compatibility.
+    """
     service = models.ForeignKey(
-        CalendarSchedule,
+        "CalendarSchedule",
         on_delete=models.CASCADE,
         db_column="service_id",
         related_name="calendar_dates",
@@ -100,11 +112,15 @@ class CalendarDateSchedule(models.Model):
     def __str__(self):
         return f"{self.service_id} - {self.date}"
 
-
 # ==============================================================
 # SHAPES
 # ==============================================================
 class ShapeSchedule(models.Model):
+    """
+    GTFS entity: shapes.txt
+    Composite PK (shape_id, shape_pt_sequence) replaced by unique_together
+    for Django ORM and admin compatibility.
+    """
     shape_id = models.CharField(max_length=64)
     shape_pt_lat = models.FloatField()
     shape_pt_lon = models.FloatField()
@@ -197,14 +213,19 @@ class TripSchedule(models.Model):
 # STOP TIMES
 # ==============================================================
 class StopTimeSchedule(models.Model):
+    """
+    GTFS entity: stop_times.txt
+    Composite PK (trip_id, stop_sequence) replaced by unique_together
+    to maintain compatibility with Django Admin and FKs.
+    """
     trip = models.ForeignKey(
-        TripSchedule,
+        "TripSchedule",
         on_delete=models.CASCADE,
         db_column="trip_id",
         related_name="stop_times",
     )
     stop = models.ForeignKey(
-        StopSchedule,
+        "StopSchedule",
         on_delete=models.CASCADE,
         db_column="stop_id",
         related_name="stop_times",

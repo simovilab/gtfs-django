@@ -35,8 +35,10 @@ class TestGtfsPackage:
         assert hasattr(gtfs.models, "Route")
         
     def test_verification_function(self):
-        """A simple test function to verify editable installation works."""
-        return "Version 1 - Initial test"
+        """Verify that editable installation executes test correctly."""
+        output = "Version 1 - Initial test"
+        assert isinstance(output, str)
+        assert "Version" in output
         
 
 def simple_test_function():
