@@ -226,3 +226,52 @@ Developed by [Simovi Lab](https://github.com/simovilab) for processing and manag
 ---
 
 For more information about GTFS, visit the [General Transit Feed Specification](https://gtfs.org/) website.
+
+
+
+---
+
+## Reproducible Sample Data
+
+This module includes **small, deterministic GTFS-Realtime fixtures** for testing and documentation purposes.  
+They allow developers to run the system and its unit tests without relying on live MBTA feeds or external network calls.
+
+These fixtures capture a **minimal snapshot of TripUpdate, VehiclePosition, and Alert entities**, and can be regenerated at any time from the local database.
+
+---
+
+### Fixture Location
+
+The reproducible sample data is stored under:
+
+gtfs/fixtures/
+
+├── trip_update_fixture.json
+
+├── vehicle_position_fixture.json
+
+└── alert_fixture.json
+
+
+Each file contains a few representative rows from the respective realtime tables, exported as JSON.
+
+---
+
+###  Regeneration Script
+
+Fixtures can be rebuilt at any time using the script:
+
+```bash
+python -m gtfs.scripts.regenerate_fixtures
+```
+---
+
+##  Running the Realtime Streamer (MBTA)
+
+After installation, no additional database configuration is required — the project uses **SQLite** by default for testing and development.  
+Once dependencies are installed and migrations have run, you can start streaming live data directly from the MBTA GTFS-Realtime feeds.
+
+Run the following command from the project root:
+
+```bash
+python -m gtfs.scripts.stream_mbta_feeds

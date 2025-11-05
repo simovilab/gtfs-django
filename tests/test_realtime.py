@@ -24,6 +24,35 @@ except Exception:
 from gtfs.utils import realtime
 from google.transit import gtfs_realtime_pb2 as gtfs_rt
 
+FIXTURE_DIR = Path(__file__).resolve().parent.parent / "gtfs" / "fixtures"
+
+class FixtureValidationTests(unittest.TestCase):
+    """Validates the reproducible fixture files in gtfs/fixtures/."""
+
+    def test_trip_updates_fixture_exists(self):
+        path = FIXTURE_DIR / "sample_trip_updates.json"
+        self.assertTrue(path.exists(), "TripUpdates fixture missing")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("header", data)
+        self.assertIn("entity", data)
+
+    def test_vehicle_positions_fixture_exists(self):
+        path = FIXTURE_DIR / "sample_vehicle_positions.json"
+        self.assertTrue(path.exists(), "VehiclePositions fixture missing")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIsInstance(data, list)
+        self.assertGreater(len(data), 0)
+
+    def test_alerts_fixture_exists(self):
+        path = FIXTURE_DIR / "sample_alerts.json"
+        self.assertTrue(path.exists(), "Alerts fixture missing")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIsInstance(data, list)
+        self.assertGreater(len(data), 0)
+
 
 class GTFSRealtimeTests(unittest.TestCase):
     def setUp(self):
