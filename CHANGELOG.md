@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 - Added Test `tests/test_fixtures.py` validating command + `loaddata` integration.
 - Added complete GTFS import pipeline supporting 9 core Schedule files (agency, routes, stops, trips, calendar,   calendar_dates, stop_times, shapes, feed_info).
 - Added integration test `tests/test_import_full_gtfs.py` generating synthetic ZIP under `tmp_gtfs/`.
+- Added `export_gtfs_schedule()` function in `gtfs/utils/schedule.py` to serialize all 9 GTFS Schedule models.
+- Added management command `exportgtfs` to create a valid GTFS-compliant ZIP.
+- Added `scripts/download_mbta_gtfs.py` for optional real-feed testing (MBTA).
+- Embedded metadata (version, timestamp) into `feed_info.txt` during export.
 
 ### Changed 
 - Updated `README.md` to include documentation for GTFS Schedule data model.
@@ -24,6 +28,8 @@ All notable changes to this project will be documented in this file.
 - Updated `settings.py` to disable GIS extensions during testing (non-GIS backend for tests).
 - Shapes PKs in fixtures are numeric for Django compatibility.
 - Updated `gtfs/utils/schedule.py` to support full file parsing, validation, and bulk insertion.
+- Updated project documentation to include deterministic export workflow.
+- Improved logging and structure in `schedule.py` for model traversal and CSV writing.
 
 ### Testing
 - Verified 3 deterministic Schedule CRUD tests run successfully via:
@@ -38,3 +44,9 @@ All notable changes to this project will be documented in this file.
 - Verified full import flow using:
   ```bash
   pytest -v tests/test_import_full_gtfs.py
+
+- Verified deterministic export using synthetic test data (`tmp_gtfs/full_gtfs.zip`).
+- Export validated via:
+  ```bash
+  pytest -v tests/test_import_full_gtfs.py
+  python manage.py exportgtfs

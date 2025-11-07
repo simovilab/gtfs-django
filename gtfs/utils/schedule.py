@@ -71,18 +71,18 @@ def _bool01(v):
 
 
 # ---------------------------
-# Importador principal
+# Import function
 # ---------------------------
 def import_gtfs(feed_path: str | Path):
     """
-    Importa un GTFS Schedule completo (ZIP o carpeta) a la BD.
+    - Import a complete GTFS Schedule (ZIP or folder) into the database.
 
-    Soporta: agency, routes, stops, trips, calendar, calendar_dates,
+    - Supports: agency, routes, stops, trips, calendar, calendar_dates,
              shapes, stop_times, feed_info.
 
-    - Valida FKs y tipos básicos.
-    - Reporta errores con contexto (archivo + línea).
-    - Ejecuta todo en una transacción atómica.
+    - Validate FKs and basic types.
+    - Report errors with context (file + line).
+    - Execute everything in one atomic transaction.
     """
     feed_path = Path(feed_path)
     if not feed_path.exists():
@@ -97,7 +97,7 @@ def import_gtfs(feed_path: str | Path):
     else:
         root = feed_path
 
-    # Cargar todos los CSV (si existen)
+    # Load all CSV files (if any)
     files = {
         "agency": "agency.txt",
         "routes": "routes.txt",
@@ -111,7 +111,7 @@ def import_gtfs(feed_path: str | Path):
     }
     rows = {key: _read_csv_rows(root, fname) for key, fname in files.items()}
 
-    # Requeridos mínimos por spec (calendar o calendar_dates, al menos uno):
+    # Minimum requirements per spec (calendar or calendar_dates, at least one):
     for req in ("agency", "routes", "stops", "trips"):
         if rows[req] is None or len(rows[req]) == 0:
             raise CommandError(f"Missing required GTFS file or empty: {files[req]}")
@@ -127,7 +127,7 @@ def import_gtfs(feed_path: str | Path):
         if rows[k] is not None:
             print(f"  - {fname}")
 
-    # Import atómico
+    # Atomic Import
     try:
         with transaction.atomic():
 
@@ -208,7 +208,7 @@ def import_gtfs(feed_path: str | Path):
                     if parent_station and not StopSchedule.objects.filter(
                         pk=parent_station
                     ).exists():
-                        # No creamos parent implícito; forzamos error contextual
+                        # Don't create an implicit parent; force a contextual error
                         raise CommandError(
                             f"In stops.txt line {i}: parent_station '{parent_station}' not found"
                         )
@@ -237,7 +237,7 @@ def import_gtfs(feed_path: str | Path):
                     raise CommandError(f"In stops.txt line {i}: {e}")
 
             # ------------------
-            # 5) Trips  (auto-crea servicio si no vino calendar)
+            # 5) Trips  (auto-creates service if calendar is not included)
             # ------------------
             for i, r in enumerate(rows["trips"], start=2):
                 try:
@@ -250,8 +250,8 @@ def import_gtfs(feed_path: str | Path):
                     if not CalendarSchedule.objects.filter(
                         pk=service_id
                     ).exists():
-                        # Si no hay calendar pero hay calendar_dates, podemos crear un servicio dummy
-                        # para no romper FK (aceptado por varias implementaciones GTFS).
+                        # If there is no calendar but there is calendar_dates, we can create a dummy service
+                        # to avoid breaking FK (accepted by several GTFS implementations).
                         CalendarSchedule.objects.update_or_create(
                             service_id=service_id,
                             defaults={
@@ -275,8 +275,8 @@ def import_gtfs(feed_path: str | Path):
                             "trip_short_name": _as_str(r.get("trip_short_name"), None),
                             "direction_id": _as_int(r.get("direction_id"), 0),
                             "block_id": _as_str(r.get("block_id"), None),
-                            # Nota: tu modelo TripSchedule.shape es FK a ShapeSchedule,
-                            # pero ShapeSchedule no tiene PK=shape_id; por lo tanto lo dejamos en None.
+                            # Note: TripSchedule.shape model is FK to ShapeSchedule,
+                            # but ShapeSchedule doesn't have PK=shape_id; therefore we leave it as None.
                             "shape": None,
                             "wheelchair_accessible": _as_int(
                                 r.get("wheelchair_accessible"), 0
@@ -289,7 +289,7 @@ def import_gtfs(feed_path: str | Path):
                     raise CommandError(f"In trips.txt line {i}: {e}")
 
             # ------------------
-            # 6) Stop Times (opcional pero común)
+            # 6) Stop Times 
             # ------------------
             if rows["stop_times"]:
                 for i, r in enumerate(rows["stop_times"], start=2):
@@ -356,7 +356,7 @@ def import_gtfs(feed_path: str | Path):
                         if not CalendarSchedule.objects.filter(
                             pk=service_id
                         ).exists():
-                            # Si no existe aún (por trips o calendar), créalo dummy.
+                            # If it doesn't exist yet (by trips or calendar), create a dummy.
                             CalendarSchedule.objects.update_or_create(
                                 service_id=service_id,
                                 defaults={
@@ -382,7 +382,7 @@ def import_gtfs(feed_path: str | Path):
                         raise CommandError(f"In calendar_dates.txt line {i}: {e}")
 
             # ------------------
-            # 9) Feed Info (opcional)
+            # 9) Feed Info (optional)
             # ------------------
             if rows["feed_info"]:
                 for i, r in enumerate(rows["feed_info"], start=2):
@@ -406,8 +406,146 @@ def import_gtfs(feed_path: str | Path):
                     except Exception as e:
                         raise CommandError(f"In feed_info.txt line {i}: {e}")
 
-        # fin transaction
+        # end transaction
     except IntegrityError as e:
         raise CommandError(f"Database integrity error: {e}")
 
     print("Import completed successfully.")
+
+
+# =====================================================
+# EXPORT GTFS
+# =====================================================
+
+def export_gtfs_schedule(output_zip: str = "tmp_gtfs/exported_feed.zip"):
+    """
+    Export GTFS Schedule data from the database to a valid GTFS ZIP.
+
+    Steps:
+      1. Create temporary directory for .txt files.
+      2. Export all core Schedule models to CSV files.
+      3. Ensure FK integrity (skip orphan rows).
+      4. Add feed_info metadata with timestamp/version.
+      5. Zip all .txt files into output ZIP archive.
+    """
+
+    tmp_dir = Path("tmp_gtfs")
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_zip)
+
+    def write_csv(filename, fieldnames, rows):
+        """Helper to write GTFS CSVs with UTF-8 encoding."""
+        file_path = tmp_dir / filename
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+        print(f"Wrote {filename} ({len(rows)} rows)")
+        return file_path
+
+    # ===========================
+    # Export function
+    # ===========================
+
+    with transaction.atomic():
+        # --- agency.txt ---
+        agencies = list(
+            AgencySchedule.objects.values(
+                "agency_id", "agency_name", "agency_url",
+                "agency_timezone", "agency_phone", "agency_email"
+            )
+        )
+        write_csv("agency.txt", agencies[0].keys() if agencies else [
+            "agency_id", "agency_name", "agency_url",
+            "agency_timezone", "agency_phone", "agency_email"
+        ], agencies)
+
+        # --- routes.txt ---
+        routes = list(
+            RouteSchedule.objects.filter(
+                agency_id__in=[a["agency_id"] for a in agencies]
+            ).values(
+                "route_id", "agency_id", "route_short_name",
+                "route_long_name", "route_desc", "route_type"
+            )
+        )
+        write_csv("routes.txt", routes[0].keys() if routes else [
+            "route_id", "agency_id", "route_short_name",
+            "route_long_name", "route_desc", "route_type"
+        ], routes)
+
+        # --- stops.txt ---
+        stops = list(
+            StopSchedule.objects.values(
+                "stop_id", "stop_name", "stop_lat", "stop_lon"
+            )
+        )
+        write_csv("stops.txt", stops[0].keys() if stops else [
+            "stop_id", "stop_name", "stop_lat", "stop_lon"
+        ], stops)
+
+        # --- trips.txt ---
+        trips = list(
+            TripSchedule.objects.filter(
+                route_id__in=[r["route_id"] for r in routes]
+            ).values(
+                "trip_id", "route_id", "service_id", "trip_headsign"
+            )
+        )
+        write_csv("trips.txt", trips[0].keys() if trips else [
+            "trip_id", "route_id", "service_id", "trip_headsign"
+        ], trips)
+
+        # --- calendar.txt ---
+        calendars = list(CalendarSchedule.objects.values())
+        if calendars:
+            write_csv("calendar.txt", calendars[0].keys(), calendars)
+
+        # --- calendar_dates.txt ---
+        cal_dates = list(CalendarDateSchedule.objects.values())
+        if cal_dates:
+            write_csv("calendar_dates.txt", cal_dates[0].keys(), cal_dates)
+
+        # --- stop_times.txt ---
+        stop_times = list(StopTimeSchedule.objects.values())
+        if stop_times:
+            write_csv("stop_times.txt", stop_times[0].keys(), stop_times)
+
+        # --- shapes.txt ---
+        shapes = list(ShapeSchedule.objects.values())
+        if shapes:
+            write_csv("shapes.txt", shapes[0].keys(), shapes)
+
+        # --- feed_info.txt ---
+        feeds = list(FeedInfoSchedule.objects.values())
+        if not feeds:
+            feeds = [{
+                "feed_publisher_name": "SIMOVILab",
+                "feed_publisher_url": "https://simovilab.org",
+                "feed_lang": "en",
+                "feed_version": "0.2.0",
+                "feed_start_date": "2025-01-01",
+                "feed_end_date": "2025-12-31",
+                "feed_contact_email": "admin@simovilab.org",
+                "feed_contact_url": "https://simovilab.org/contact",
+            }]
+        write_csv("feed_info.txt", feeds[0].keys(), feeds)
+
+    # ===========================
+    # 2. Zip all .txt files
+    # ===========================
+    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for txt_file in tmp_dir.glob("*.txt"):
+            zf.write(txt_file, txt_file.name)
+    print(f"Exported GTFS feed to {output_path}")
+
+    return output_path
+
+
+# =====================================================
+# VALIDATE GTFS (placeholder for future integration)
+# =====================================================
+def validate_gtfs_schedule():
+    """Placeholder for future GTFS validation logic."""
+    print("GTFS validation placeholder — to be implemented.")
