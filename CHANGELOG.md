@@ -21,6 +21,9 @@ All notable changes to this project will be documented in this file.
 - Added management command `exportgtfs` to create a valid GTFS-compliant ZIP.
 - Added `scripts/download_mbta_gtfs.py` for optional real-feed testing (MBTA).
 - Embedded metadata (version, timestamp) into `feed_info.txt` during export.
+- Added `gtfs/utils/eta_builder.py` — ETA computation module with deterministic mode and Bytewax hooks.
+- Added `gtfs/management/commands/build_stop_times.py` — Management command to export `stop_times.txt` deterministically.
+- Added `tests/test_eta_builder.py` — Synthetic tests validating deterministic and Bytewax-free execution.
 
 ### Changed 
 - Updated `README.md` to include documentation for GTFS Schedule data model.
@@ -50,3 +53,8 @@ All notable changes to this project will be documented in this file.
   ```bash
   pytest -v tests/test_import_full_gtfs.py
   python manage.py exportgtfs
+
+- Verified stop_times builder using ETA estimator, pluggable interface to ETA module and GTFS realtime.
+  ```bash
+  python manage.py build_stop_times --seed 42 --trip R10 --output tmp_gtfs/stop_times_eta.txt
+  pytest -v tests/test_eta_builder.py
