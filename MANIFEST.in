@@ -1,0 +1,40 @@
+# Archivos principales del paquete
+include LICENSE
+include README.md
+
+# Incluir todo el código fuente de la app
+recursive-include gtfs *.py
+
+# Incluir plantillas, fixtures, datos de pruebas y migraciones
+recursive-include gtfs/templates *
+recursive-include gtfs/fixtures *
+recursive-include gtfs/migrations *
+recursive-include gtfs/tests *
+recursive-include gtfs/utils *
+# Archivos principales del paquete
+include LICENSE
+include README.md
+
+# Incluir todo el código fuente de la app
+recursive-include gtfs *.py
+
+# Incluir plantillas, fixtures, datos de pruebas y migraciones
+recursive-include gtfs/templates *
+recursive-include gtfs/fixtures *
+recursive-include gtfs/migrations *
+recursive-include gtfs/tests *
+recursive-include gtfs/utils *
+
+# Excluir archivos no necesarios
+exclude db.sqlite3
+exclude *.pyc
+exclude __pycache__/*
+prune env
+prune tests/data
+
+# Excluir archivos no necesarios
+exclude db.sqlite3
+exclude *.pyc
+exclude __pycache__/*
+prune env
+prune tests/data
