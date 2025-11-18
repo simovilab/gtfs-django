@@ -17,7 +17,9 @@ dependencies = [
     "matplotlib>=3.9.4",
     "pandas>=2.3.3",
     "psycopg>=3.2.11",
+    "redis>=7.0.1",
     "requests>=2.31",
+    "scikit-learn>=1.7.2",
 ]
 
 [tool.uv.workspace]
