@@ -159,6 +159,7 @@ class EWMAModel:
 
 
 def train_ewma(dataset_name: str = "sample_dataset",
+               route_id: Optional[str] = None,
                alpha: float = 0.3,
                group_by: list = ['route_id', 'stop_sequence'],
                min_observations: int = 3,
@@ -169,6 +170,7 @@ def train_ewma(dataset_name: str = "sample_dataset",
     
     Args:
         dataset_name: Name of dataset
+        route_id: Optional route ID for route-specific training
         alpha: EWMA smoothing parameter
         group_by: Grouping columns
         min_observations: Minimum observations threshold
@@ -181,12 +183,26 @@ def train_ewma(dataset_name: str = "sample_dataset",
     print(f"\n{'='*60}")
     print(f"Training EWMA Model".center(60))
     print(f"{'='*60}\n")
+    
+    route_info = f" (route: {route_id})" if route_id else " (global)"
+    print(f"Scope{route_info}")
     print(f"Config: alpha={alpha}, group_by={group_by}, min_obs={min_observations}")
     
     # Load dataset
     print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
+    
+    # Filter by route if specified
+    if route_id is not None:
+        df = dataset.df
+        df_filtered = df[df['route_id'] == route_id].copy()
+        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
+        
+        if len(df_filtered) == 0:
+            raise ValueError(f"No data found for route {route_id}")
+        
+        dataset.df = df_filtered
     
     # Split data temporally (important for time series)
     train_df, val_df, test_df = dataset.temporal_split(
@@ -238,10 +254,13 @@ def train_ewma(dataset_name: str = "sample_dataset",
     metadata = {
         'model_type': 'ewma',
         'dataset': dataset_name,
+        'route_id': route_id,
         'alpha': alpha,
         'group_by': group_by,
         'min_observations': min_observations,
         'n_groups': len(model.ewma_values),
+        'n_samples': len(train_df) + len(val_df) + len(test_df),
+        'n_trips': dataset.df['trip_id'].nunique() if route_id else None,
         'train_samples': len(train_df),
         'test_samples': len(test_df),
         'test_coverage': float(test_coverage),
@@ -255,6 +274,7 @@ def train_ewma(dataset_name: str = "sample_dataset",
             model_type='ewma',
             dataset_name=dataset_name,
             feature_groups=['temporal', 'route'],
+            route_id=route_id,
             alpha=str(alpha).replace('.', '_')
         )
         

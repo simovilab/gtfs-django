@@ -158,6 +158,7 @@ class PolyRegDistanceModel:
 
 
 def train_polyreg_distance(dataset_name: str = "sample_dataset",
+                          route_id: Optional[str] = None,
                           degree: int = 2,
                           alpha: float = 1.0,
                           route_specific: bool = False,
@@ -168,9 +169,10 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
     
     Args:
         dataset_name: Name of dataset in datasets/ directory
+        route_id: Optional route ID for route-specific training (overrides route_specific)
         degree: Polynomial degree
         alpha: Ridge regularization strength
-        route_specific: Whether to fit per-route models
+        route_specific: Whether to fit per-route models (ignored if route_id specified)
         test_size: Fraction of data for testing
         save_model: Whether to save to registry
         
@@ -180,12 +182,28 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
     print(f"\n{'='*60}")
     print(f"Training Polynomial Regression Distance Model".center(60))
     print(f"{'='*60}\n")
+    
+    route_info = f" (route: {route_id})" if route_id else " (global)"
+    print(f"Scope{route_info}")
     print(f"Config: degree={degree}, alpha={alpha}, route_specific={route_specific}")
     
     # Load dataset
     print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
+    
+    # Filter by route if specified (single-route model)
+    if route_id is not None:
+        df = dataset.df
+        df_filtered = df[df['route_id'] == route_id].copy()
+        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
+        
+        if len(df_filtered) == 0:
+            raise ValueError(f"No data found for route {route_id}")
+        
+        dataset.df = df_filtered
+        # When training on single route, don't need route_specific flag
+        route_specific = False
     
     # Split data temporally
     train_df, val_df, test_df = dataset.temporal_split(
@@ -219,9 +237,9 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
     print_metrics_table(test_metrics, "Test Metrics")
     
     # Get sample coefficients
-    sample_coefs = model.get_coefficients()
+    sample_coefs = model.get_coefficients(route_id=route_id)
     if sample_coefs:
-        print(f"\nModel coefficients (sample):")
+        print(f"\nModel coefficients:")
         print(f"  Intercept: {sample_coefs['intercept']:.2f}")
         print(f"  Coefficients: {[f'{c:.6f}' for c in sample_coefs['coefficients'][:5]]}")
     
@@ -229,10 +247,13 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
     metadata = {
         'model_type': 'polyreg_distance',
         'dataset': dataset_name,
+        'route_id': route_id,
         'degree': degree,
         'alpha': alpha,
         'route_specific': route_specific,
         'n_models': len(model.models) if route_specific else 1,
+        'n_samples': len(train_df) + len(val_df) + len(test_df),
+        'n_trips': dataset.df['trip_id'].nunique() if route_id else None,
         'train_samples': len(train_df),
         'test_samples': len(test_df),
         'metrics': {**val_metrics, **test_metrics}
@@ -244,6 +265,7 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
             model_type='polyreg_distance',
             dataset_name=dataset_name,
             feature_groups=['distance'],
+            route_id=route_id,
             degree=degree,
             route_specific='yes' if route_specific else 'no'
         )

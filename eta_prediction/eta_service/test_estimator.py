@@ -1,5 +1,5 @@
 """
-Quick test script for estimate_stop_times()
+Enhanced test script for estimate_stop_times() with route-specific model support
 Run from project root: python eta_service/test_estimator.py
 """
 
@@ -16,11 +16,11 @@ from eta_service.estimator import estimate_stop_times
 from models.common.registry import get_registry
 
 
-def get_sample_vp_data():
+def get_sample_vp_data(route='1'):
     """Mock vehicle position in MQTT/Redis format."""
     return {
-        'vehicle_id': 'vehicle_42',
-        'route': '1',
+        'vehicle_id': f'vehicle_{route}_42',
+        'route': route,
         'lat': 9.9281,
         'lon': -84.0907,
         'speed': 10.5,  # m/s
@@ -61,12 +61,14 @@ def test_basic_prediction():
         upcoming_stops=stops,
         route_id='1',
         trip_id='trip_001',
+        prefer_route_model=True,
         max_stops=3
     )
     
     # Display results
     print(f"\n[PREDICTIONS]")
-    print(f"  Model: {result.get('model_type', 'N/A')}")
+    print(f"  Model Type: {result.get('model_type', 'N/A')}")
+    print(f"  Model Scope: {result.get('model_scope', 'N/A')}")
     print(f"  Model Key: {result['model_key']}")
     print(f"  Computed at: {result['computed_at']}")
     
@@ -90,49 +92,120 @@ def test_basic_prediction():
     return True
 
 
-def test_all_model_types():
-    """Test with each model type explicitly."""
+def test_route_specific_models():
+    """Test route-specific vs global model selection."""
     
-    print("\n\nTEST 2: Testing All Model Types")
+    print("\n\nTEST 2: Route-Specific vs Global Model Selection")
     print("=" * 70)
     
     registry = get_registry()
-    all_models = registry.list_models()
+    
+    # Get available routes with trained models
+    routes = registry.get_routes()
+    print(f"\nFound {len(routes)} routes with trained models: {routes}")
+    
+    # Also check for global models
+    global_models = [k for k, info in registry.registry.items() 
+                     if info.get('route_id') is None]
+    print(f"Found {len(global_models)} global models")
+    
+    vp_data = get_sample_vp_data()
+    stops = get_sample_stops()[:2]  # Just 2 stops for speed
+    
+    test_routes = routes[:3] if len(routes) >= 3 else routes  # Test up to 3 routes
+    
+    print(f"\n{'-' * 70}")
+    print("Testing route-specific model preference:")
+    print(f"{'-' * 70}")
+    
+    for route_id in test_routes:
+        print(f"\nRoute {route_id}:")
+        
+        # Test 1: With prefer_route_model=True
+        result_route = estimate_stop_times(
+            vehicle_position=get_sample_vp_data(route_id),
+            upcoming_stops=stops,
+            route_id=route_id,
+            prefer_route_model=True,
+            max_stops=2
+        )
+        
+        # Test 2: With prefer_route_model=False (force global)
+        result_global = estimate_stop_times(
+            vehicle_position=get_sample_vp_data(route_id),
+            upcoming_stops=stops,
+            route_id=route_id,
+            prefer_route_model=False,
+            max_stops=2
+        )
+        
+        print(f"  Route-specific: {result_route.get('model_scope', 'N/A')}")
+        if result_route.get('predictions') and not result_route['predictions'][0].get('error'):
+            print(f"    ETA: {result_route['predictions'][0]['eta_formatted']}")
+        
+        print(f"  Global forced:  {result_global.get('model_scope', 'N/A')}")
+        if result_global.get('predictions') and not result_global['predictions'][0].get('error'):
+            print(f"    ETA: {result_global['predictions'][0]['eta_formatted']}")
+        
+        # Compare if both succeeded
+        if (result_route.get('predictions') and result_global.get('predictions') and
+            not result_route['predictions'][0].get('error') and 
+            not result_global['predictions'][0].get('error')):
+            
+            eta_route = result_route['predictions'][0]['eta_seconds']
+            eta_global = result_global['predictions'][0]['eta_seconds']
+            diff = eta_route - eta_global
+            diff_pct = (diff / eta_global * 100) if eta_global > 0 else 0
+            
+            print(f"  Difference: {diff:+.1f}s ({diff_pct:+.1f}%)")
+    
+    print("\n" + "=" * 70)
+    return True
+
+
+def test_all_model_types():
+    """Test with each model type explicitly."""
+    
+    print("\n\nTEST 3: Testing All Model Types")
+    print("=" * 70)
+    
+    registry = get_registry()
+    df = registry.list_models()
+    
+    if df.empty:
+        print("No models found in registry!")
+        return False
     
     # Group by model type
-    model_types = {}
-    for model_key in all_models:
-        try:
-            meta = registry.load_metadata(model_key)
-            model_type = meta.get('model_type', 'unknown')
-            if model_type not in model_types:
-                model_types[model_type] = []
-            model_types[model_type].append(model_key)
-        except:
-            continue
+    model_types = df['model_type'].unique()
     
     print(f"\nFound {len(model_types)} model types:")
-    for mtype, keys in model_types.items():
-        print(f"  - {mtype}: {len(keys)} models")
+    for mtype in model_types:
+        count = len(df[df['model_type'] == mtype])
+        route_count = len(df[(df['model_type'] == mtype) & (df['route_id'] != 'global')])
+        global_count = len(df[(df['model_type'] == mtype) & (df['route_id'] == 'global')])
+        print(f"  - {mtype}: {count} models ({route_count} route-specific, {global_count} global)")
     
     vp_data = get_sample_vp_data()
     stops = get_sample_stops()[:2]  # Just 2 stops for speed
     
     results_by_type = {}
     
-    for model_type, keys in model_types.items():
-        print(f"\n{'-' * 70}")
-        print(f"Testing {model_type.upper()}...")
+    print(f"\n{'-' * 70}")
+    print("Testing each model type:")
+    print(f"{'-' * 70}")
+    
+    for model_type in model_types:
+        print(f"\n{model_type.upper()}:")
         
-        # Use first model of this type
-        model_key = keys[0]
-        
+        # Test with auto-selection for this type
         result = estimate_stop_times(
             vehicle_position=vp_data,
             upcoming_stops=stops,
             route_id='1',
             trip_id='trip_001',
-            model_key=model_key,
+            model_type=model_type,
+            prefer_route_model=True,
             max_stops=2
         )
         
@@ -142,7 +215,8 @@ def test_all_model_types():
             first_pred = result['predictions'][0] if result['predictions'] else None
             if first_pred and not first_pred.get('error'):
                 print(f"  ✓ Success!")
-                print(f"    Model: {model_key[:50]}...")
+                print(f"    Scope: {result.get('model_scope', 'unknown')}")
+                print(f"    Model: {result['model_key'][:60]}...")
                 print(f"    First stop ETA: {first_pred['eta_formatted']}")
                 results_by_type[model_type] = first_pred['eta_seconds']
             else:
@@ -160,10 +234,90 @@ def test_all_model_types():
     return True
 
 
+def test_route_performance_comparison():
+    """Compare predictions across different routes with varying training data."""
+    
+    print("\n\nTEST 4: Route Performance Comparison")
+    print("=" * 70)
+    
+    registry = get_registry()
+    
+    # Get routes with their metadata
+    routes = registry.get_routes(model_type='polyreg_time')
+
+    print("ROUTES: ", routes)
+    
+    if not routes:
+        print("No route-specific polyreg_time models found.")
+        return True
+    
+    print(f"\nComparing polyreg_time models across {len(routes)} routes:\n")
+    
+    stops = get_sample_stops()[:1]  # Single stop for comparison
+    results = []
+    
+    for route_id in routes:
+        # Get best model for this route
+        model_key = registry.get_best_model(
+            model_type='polyreg_time',
+            route_id=route_id,
+            metric='test_mae_seconds'
+        )
+        
+        if not model_key:
+            continue
+        
+        # Get metadata
+        try:
+            metadata = registry.load_metadata(model_key)
+            n_trips = metadata.get('n_trips', 0)
+            test_mae_min = metadata.get('metrics', {}).get('test_mae_minutes', None)
+        except:
+            continue
+        
+        # Make prediction
+        result = estimate_stop_times(
+            vehicle_position=get_sample_vp_data(route_id),
+            upcoming_stops=stops,
+            route_id=route_id,
+            model_key=model_key,
+            max_stops=1
+        )
+        
+        if result.get('predictions') and not result['predictions'][0].get('error'):
+            eta = result['predictions'][0]['eta_seconds']
+            results.append({
+                'route_id': route_id,
+                'n_trips': n_trips,
+                'test_mae_min': test_mae_min,
+                'prediction_eta': eta
+            })
+    
+    if results:
+        # Sort by number of trips
+        results.sort(key=lambda x: x['n_trips'], reverse=True)
+        
+        print(f"{'Route':8s} {'Trips':>6s} {'Test MAE':>10s} {'Prediction':>12s}")
+        print("-" * 45)
+        
+        for r in results:
+            mae_str = f"{r['test_mae_min']:.2f} min" if r['test_mae_min'] else "N/A"
+            eta_str = f"{r['prediction_eta']:.0f}s ({r['prediction_eta']/60:.1f}m)"
+            print(f"{r['route_id']:8s} {r['n_trips']:6d} {mae_str:>10s} {eta_str:>12s}")
+        
+        print(f"\n{'='*70}")
+        print("Insight: Routes with more training trips should have lower MAE")
+        print("and potentially more accurate predictions for similar conditions.")
+        print(f"{'='*70}")
+    
+    print("\n" + "=" * 70)
+    return True
+
+
 def test_different_distances():
     """Test predictions at various distances."""
     
-    print("\n\nTEST 3: Predictions at Different Distances")
+    print("\n\nTEST 5: Predictions at Different Distances")
     print("=" * 70)
     
     vp_data = get_sample_vp_data()
@@ -175,14 +329,14 @@ def test_different_distances():
     
     registry = get_registry()
     # Try to find a polyreg_distance model for this test
-    all_models = registry.list_models()
-    polyreg_keys = [k for k in all_models if 'polyreg_distance' in k]
+    df = registry.list_models(route_id='Green-B', model_type='polyreg_distance')
+    # df = registry.list_models(model_type='polyreg_distance')
     
-    if not polyreg_keys:
+    if df.empty:
         print("  No polyreg_distance models found. Using best model.")
         model_key = None
     else:
-        model_key = polyreg_keys[0]
+        model_key = df.iloc[0]['model_key']
         print(f"  Using model: {model_key[:60]}...")
     
     for dist_m in test_distances:
@@ -220,11 +374,11 @@ def test_different_distances():
 def test_edge_cases():
     """Test error handling."""
     
-    print("\n\nTEST 4: Edge Cases & Error Handling")
+    print("\n\nTEST 6: Edge Cases & Error Handling")
     print("=" * 70)
     
     # Test 1: No stops
-    print("\n4a. Empty stops list:")
+    print("\n6a. Empty stops list:")
     result = estimate_stop_times(
         vehicle_position=get_sample_vp_data(),
         upcoming_stops=[],
@@ -234,7 +388,7 @@ def test_edge_cases():
     print(f"    ✓ Handled gracefully" if result.get('error') else "    ✗ Should have errored")
     
     # Test 2: Invalid model key
-    print("\n4b. Invalid model key:")
+    print("\n6b. Invalid model key:")
     result = estimate_stop_times(
         vehicle_position=get_sample_vp_data(),
         upcoming_stops=get_sample_stops()[:1],
@@ -245,7 +399,7 @@ def test_edge_cases():
     print(f"    ✓ Handled gracefully" if result.get('error') else "    ✗ Should have errored")
     
     # Test 3: Missing optional fields
-    print("\n4c. Minimal vehicle position:")
+    print("\n6c. Minimal vehicle position:")
     minimal_vp = {
         'vehicle_id': 'minimal_bus',
         'lat': 9.9281,
@@ -263,18 +417,36 @@ def test_edge_cases():
     else:
         print(f"    ✓ Handled missing fields, got ETA: {result['predictions'][0].get('eta_formatted', 'N/A')}")
     
+    # Test 4: Route with no trained model
+    print("\n6d. Route without trained model:")
+    result = estimate_stop_times(
+        vehicle_position=get_sample_vp_data('999'),
+        upcoming_stops=get_sample_stops()[:1],
+        route_id='999',
+        prefer_route_model=True,
+        max_stops=1
+    )
+    if result.get('error'):
+        print(f"    Error: {result['error']}")
+    else:
+        print(f"    ✓ Fell back to: {result.get('model_scope', 'N/A')} model")
+        if result['predictions'] and not result['predictions'][0].get('error'):
+            print(f"    ETA: {result['predictions'][0]['eta_formatted']}")
+    
     print("\n" + "=" * 70)
     return True
 
 
 if __name__ == '__main__':
     print("\n" + "=" * 70)
-    print("ETA ESTIMATOR TEST SUITE")
+    print("ETA ESTIMATOR TEST SUITE - Route-Specific Edition")
     print("=" * 70 + "\n")
     
     tests = [
         ("Basic Prediction", test_basic_prediction),
+        ("Route-Specific Models", test_route_specific_models),
         ("All Model Types", test_all_model_types),
+        ("Route Performance Comparison", test_route_performance_comparison),
         ("Different Distances", test_different_distances),
         ("Edge Cases", test_edge_cases),
     ]
@@ -298,4 +470,6 @@ if __name__ == '__main__':
     print(f"FINAL RESULTS: {passed}/{len(tests)} tests passed")
     if failed == 0:
         print("🎉 All tests passed!")
+    else:
+        print(f"⚠️  {failed} test(s) failed or crashed")
     print("=" * 70 + "\n")

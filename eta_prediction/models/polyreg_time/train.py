@@ -316,6 +316,7 @@ class PolyRegTimeModel:
 
 
 def train_polyreg_time(dataset_name: str = "sample_dataset",
+                      route_id: Optional[str] = None,
                       poly_degree: int = 2,
                       alpha: float = 1.0,
                       include_temporal: bool = True,
@@ -329,6 +330,7 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     
     Args:
         dataset_name: Dataset name
+        route_id: Optional route ID for route-specific training
         poly_degree: Polynomial degree for distance
         alpha: Ridge regularization
         include_temporal: Include temporal features
@@ -344,6 +346,9 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     print(f"\n{'='*60}")
     print(f"Polynomial Regression Time Model".center(60))
     print(f"{'='*60}\n")
+    
+    route_info = f" (route: {route_id})" if route_id else " (global)"
+    print(f"Scope{route_info}")
     print(f"Config:")
     print(f"  poly_degree={poly_degree}, alpha={alpha}")
     print(f"  temporal={include_temporal}, operational={include_operational}")
@@ -353,6 +358,17 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
+    
+    # Filter by route if specified
+    if route_id is not None:
+        df = dataset.df
+        df_filtered = df[df['route_id'] == route_id].copy()
+        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
+        
+        if len(df_filtered) == 0:
+            raise ValueError(f"No data found for route {route_id}")
+        
+        dataset.df = df_filtered
     
     # Split data
     train_df, val_df, test_df = dataset.temporal_split(
@@ -405,6 +421,7 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     metadata = {
         'model_type': 'polyreg_time',
         'dataset': dataset_name,
+        'route_id': route_id,
         'poly_degree': poly_degree,
         'alpha': alpha,
         'include_temporal': include_temporal,
@@ -413,6 +430,8 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         'handle_nan': handle_nan,
         'n_features': len(model.feature_cols) if model.feature_cols else 0,
         'features': model.feature_cols,
+        'n_samples': len(train_df) + len(val_df) + len(test_df),
+        'n_trips': dataset.df['trip_id'].nunique() if route_id else None,
         'train_samples': len(train_df),
         'test_samples': len(test_df),
         'metrics': {**val_metrics, **test_metrics}
@@ -420,10 +439,12 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     
     # Save
     if save_model:
+        feature_groups = ['temporal', 'operational'] if include_temporal else ['operational']
         model_key = ModelKey.generate(
             model_type='polyreg_time',
             dataset_name=dataset_name,
-            feature_groups=['temporal', 'operational'] if include_temporal else ['operational'],
+            feature_groups=feature_groups,
+            route_id=route_id,
             degree=poly_degree,
             handle_nan=handle_nan
         )

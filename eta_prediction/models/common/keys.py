@@ -11,14 +11,16 @@ class ModelKey:
     """
     Generates unique, descriptive keys for trained models.
     
-    Format: {model_type}_{dataset}_{features}_{timestamp}
-    Example: polyreg_distance_sample_temporal-position_20250126_143022
+    Format: {model_type}_{dataset}_{features}_{route_id}_{timestamp}
+    Example: polyreg_distance_sample_temporal-position_route_1_20250126_143022
+             polyreg_distance_sample_temporal-position_global_20250126_143022
     """
     
     @staticmethod
     def generate(model_type: str,
                  dataset_name: str,
                  feature_groups: list,
+                 route_id: Optional[str] = None,
                  version: Optional[str] = None,
                  **kwargs) -> str:
         """
@@ -28,6 +30,7 @@ class ModelKey:
             model_type: Type of model (e.g., 'polyreg_distance', 'ewma')
             dataset_name: Name of training dataset
             feature_groups: List of feature group names used
+            route_id: Optional route ID for route-specific models
             version: Optional version string, defaults to timestamp
             **kwargs: Additional metadata to include in key
             
@@ -41,13 +44,21 @@ class ModelKey:
         if version is None:
             version = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Base key
+        # Base key parts
         key_parts = [
             model_type,
             dataset_name,
-            features_str,
-            version
+            features_str
         ]
+        
+        # Add route scope (route-specific or global)
+        if route_id is not None:
+            key_parts.append(f"route_{route_id}")
+        else:
+            key_parts.append("global")
+        
+        # Add version
+        key_parts.append(version)
         
         # Add optional kwargs
         for k, v in sorted(kwargs.items()):
@@ -69,24 +80,77 @@ class ModelKey:
         """
         parts = key.split('_')
         
-        if len(parts) < 4:
+        if len(parts) < 5:
             raise ValueError(f"Invalid model key format: {key}")
         
         parsed = {
             'model_type': parts[0],
             'dataset': parts[1],
             'features': parts[2],
-            'version': '_'.join(parts[3:5]) if len(parts) >= 5 else parts[3]
         }
         
+        # Parse route scope
+        if parts[3] == 'route' and len(parts) >= 5:
+            # Route-specific model: ..._route_1_20250126_143022
+            parsed['route_id'] = parts[4]
+            parsed['scope'] = 'route'
+            parsed['version'] = '_'.join(parts[5:7]) if len(parts) >= 7 else parts[5]
+            extra_start = 7
+        elif parts[3] == 'global':
+            # Global model: ..._global_20250126_143022
+            parsed['route_id'] = None
+            parsed['scope'] = 'global'
+            parsed['version'] = '_'.join(parts[4:6]) if len(parts) >= 6 else parts[4]
+            extra_start = 6
+        else:
+            # Legacy format without scope
+            parsed['route_id'] = None
+            parsed['scope'] = 'global'
+            parsed['version'] = '_'.join(parts[3:5]) if len(parts) >= 5 else parts[3]
+            extra_start = 5
+        
         # Parse additional kwargs (key=value format)
-        if len(parts) > 5:
-            for part in parts[5:]:
+        if len(parts) > extra_start:
+            for part in parts[extra_start:]:
                 if '=' in part:
                     k, v = part.split('=', 1)
                     parsed[k] = v
         
         return parsed
+    
+    @staticmethod
+    def is_route_specific(key: str) -> bool:
+        """
+        Check if a model key is route-specific.
+        
+        Args:
+            key: Model key string
+            
+        Returns:
+            True if route-specific, False if global
+        """
+        try:
+            parsed = ModelKey.parse(key)
+            return parsed.get('scope') == 'route' and parsed.get('route_id') is not None
+        except (ValueError, IndexError):
+            return False
+    
+    @staticmethod
+    def extract_route_id(key: str) -> Optional[str]:
+        """
+        Extract route_id from a model key.
+        
+        Args:
+            key: Model key string
+            
+        Returns:
+            Route ID string or None if global model
+        """
+        try:
+            parsed = ModelKey.parse(key)
+            return parsed.get('route_id')
+        except (ValueError, IndexError):
+            return None
 
 
 class PredictionKey:

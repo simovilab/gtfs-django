@@ -90,11 +90,14 @@ class ModelRegistry:
             'model_path': str(model_path),
             'meta_path': str(meta_path),
             'saved_at': metadata['saved_at'],
-            'model_type': metadata.get('model_type', 'unknown')
+            'model_type': metadata.get('model_type', 'unknown'),
+            'route_id': metadata.get('route_id'),  # Track route scope
+            'dataset': metadata.get('dataset', 'unknown')
         }
         self._save_registry()
         
-        print(f"✓ Saved model: {model_key}")
+        route_info = f" (route: {metadata.get('route_id')})" if metadata.get('route_id') else " (global)"
+        print(f"✓ Saved model: {model_key}{route_info}")
         return model_path
     
     def load_model(self, model_key: str) -> Any:
@@ -139,12 +142,14 @@ class ModelRegistry:
     
     def list_models(self, 
                     model_type: Optional[str] = None,
+                    route_id: Optional[str] = None,
                     sort_by: str = 'saved_at') -> pd.DataFrame:
         """
         List all models in registry.
         
         Args:
             model_type: Filter by model type (e.g., 'polyreg_distance')
+            route_id: Filter by route_id (None for global models, 'all' for all models)
             sort_by: Column to sort by
             
         Returns:
@@ -153,8 +158,17 @@ class ModelRegistry:
         models = []
         
         for key, info in self.registry.items():
+            # Filter by model type
             if model_type and info.get('model_type') != model_type:
                 continue
+            
+            # Filter by route_id
+            model_route_id = info.get('route_id')
+            if route_id is not None and route_id != 'all':
+                if route_id == 'global' and model_route_id is not None:
+                    continue
+                elif route_id != 'global' and model_route_id != route_id:
+                    continue
             
             # Load metadata for richer info
             try:
@@ -162,9 +176,12 @@ class ModelRegistry:
                 models.append({
                     'model_key': key,
                     'model_type': info.get('model_type', 'unknown'),
+                    'route_id': model_route_id or 'global',
                     'saved_at': info['saved_at'],
                     'dataset': meta.get('dataset', 'unknown'),
+                    'n_samples': meta.get('n_samples'),
                     'mae_seconds': meta.get('metrics', {}).get('test_mae_seconds', None),
+                    'mae_minutes': meta.get('metrics', {}).get('test_mae_minutes', None),
                     'rmse_seconds': meta.get('metrics', {}).get('test_rmse_seconds', None),
                     'r2': meta.get('metrics', {}).get('test_r2', None),
                 })
@@ -173,6 +190,7 @@ class ModelRegistry:
                 models.append({
                     'model_key': key,
                     'model_type': info.get('model_type', 'unknown'),
+                    'route_id': model_route_id or 'global',
                     'saved_at': info['saved_at'],
                 })
         
@@ -213,40 +231,141 @@ class ModelRegistry:
     
     def get_best_model(self, 
                        model_type: Optional[str] = None,
+                       route_id: Optional[str] = None,
                        metric: str = 'test_mae_seconds',
-                       minimize: bool = True) -> str:
+                       minimize: bool = True) -> Optional[str]:
         """
         Get best model by metric.
         
         Args:
             model_type: Filter by model type
-            metric: Metric to optimize
+            route_id: Filter by route_id (None = prefer route-specific if exists, else global)
+            metric: Metric to optimize (e.g., 'test_mae_seconds', 'test_rmse_seconds')
             minimize: Whether to minimize (True) or maximize (False) metric
             
         Returns:
-            Model key of best model
+            Model key of best model, or None if no models found
         """
         candidates = []
         
         for key in self.registry.keys():
+            # Filter by model type
             if model_type and self.registry[key].get('model_type') != model_type:
                 continue
+            
+            # Filter by route
+            model_route_id = self.registry[key].get('route_id')
+            
+            if route_id is not None:
+                # Explicit route requested
+                if route_id == 'global' and model_route_id is not None:
+                    continue
+                elif route_id != 'global' and model_route_id != route_id:
+                    continue
+            # If route_id is None, we'll prefer route-specific in the sorting logic
             
             try:
                 meta = self.load_metadata(key)
                 metric_value = meta.get('metrics', {}).get(metric)
                 
                 if metric_value is not None:
-                    candidates.append((key, metric_value))
+                    candidates.append({
+                        'key': key,
+                        'metric_value': metric_value,
+                        'route_id': model_route_id,
+                        'is_route_specific': model_route_id is not None
+                    })
             except Exception:
                 continue
         
         if not candidates:
-            raise ValueError(f"No models found with metric {metric}")
+            return None
         
-        # Sort and return best
-        candidates.sort(key=lambda x: x[1], reverse=not minimize)
-        return candidates[0][0]
+        # Sort by metric, with preference for route-specific when route_id is None
+        if route_id is None:
+            # Smart routing: prefer route-specific models if they exist
+            route_specific = [c for c in candidates if c['is_route_specific']]
+            global_models = [c for c in candidates if not c['is_route_specific']]
+            
+            # If route-specific models exist, use them; otherwise fall back to global
+            candidates_to_sort = route_specific if route_specific else global_models
+        else:
+            candidates_to_sort = candidates
+        
+        # Sort by metric value
+        candidates_to_sort.sort(key=lambda x: x['metric_value'], reverse=not minimize)
+        
+        return candidates_to_sort[0]['key'] if candidates_to_sort else None
+    
+    def get_routes(self, model_type: Optional[str] = None) -> List[str]:
+        """
+        Get list of all routes that have trained models.
+        
+        Args:
+            model_type: Filter by model type
+            
+        Returns:
+            List of route IDs (excludes None/global)
+        """
+        routes = set()
+        
+        for key, info in self.registry.items():
+            if model_type and info.get('model_type') != model_type:
+                continue
+            
+            route_id = info.get('route_id')
+            if route_id is not None:
+                routes.add(route_id)
+        
+        return sorted(list(routes))
+    
+    def compare_routes(self, 
+                       model_type: str,
+                       metric: str = 'test_mae_minutes') -> pd.DataFrame:
+        """
+        Compare model performance across routes.
+        
+        Args:
+            model_type: Model type to compare
+            metric: Metric to display
+            
+        Returns:
+            DataFrame with route comparison
+        """
+        results = []
+        
+        routes = self.get_routes(model_type)
+        
+        # Add global model if exists
+        global_key = self.get_best_model(model_type=model_type, route_id='global', metric=f'test_{metric}')
+        if global_key:
+            meta = self.load_metadata(global_key)
+            results.append({
+                'route_id': 'global',
+                'n_samples': meta.get('n_samples'),
+                'n_trips': meta.get('n_trips'),
+                metric: meta.get('metrics', {}).get(f'test_{metric}'),
+                'model_key': global_key
+            })
+        
+        # Add route-specific models
+        for route_id in routes:
+            best_key = self.get_best_model(model_type=model_type, route_id=route_id, metric=f'test_{metric}')
+            if best_key:
+                meta = self.load_metadata(best_key)
+                results.append({
+                    'route_id': route_id,
+                    'n_samples': meta.get('n_samples'),
+                    'n_trips': meta.get('n_trips'),
+                    metric: meta.get('metrics', {}).get(f'test_{metric}'),
+                    'model_key': best_key
+                })
+        
+        df = pd.DataFrame(results)
+        if not df.empty:
+            df = df.sort_values('n_trips', ascending=False)
+        
+        return df
 
 
 # Global registry instance

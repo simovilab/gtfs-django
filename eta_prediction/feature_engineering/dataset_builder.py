@@ -205,29 +205,17 @@ def build_vp_training_dataset(
         print("\nWARNING: No StopTime data found!")
         return pd.DataFrame()
     
-    # # Get stop coordinates
-    # stop_ids = st_df['stop_id'].unique()
-    # stops_data = Stop.objects.filter(id__in=stop_ids).values(
-    #     'id', 'stop_lat', 'stop_lon', 'stop_name'
-    # )
-    # stops_df = pd.DataFrame.from_records(stops_data).rename(
-    #     columns={'id': 'stop_id'}
-    # )
-    
-    # st_df = st_df.merge(stops_df, on='stop_id', how='left')
-    # print(f"  Added coordinates for {st_df['stop_lat'].notna().sum():,} stops")
-    
     # Get stop coordinates
     stop_ids = st_df['stop_id'].unique()
-    # remove any NaN / None values and coerce to list for ORM filter
-    stop_ids = [s for s in stop_ids if pd.notna(s)]
-    stops_data = Stop.objects.filter(id__in=stop_ids).values(
-        'id', 'stop_lat', 'stop_lon', 'stop_name'
+    # remove any NaN / None values and coerce to STRING
+    stop_ids = [str(s) for s in stop_ids if pd.notna(s)]
+
+    # Use stop_id field instead of id
+    stops_data = Stop.objects.filter(stop_id__in=stop_ids).values(
+        'stop_id', 'stop_lat', 'stop_lon', 'stop_name'  # Changed from 'id' to 'stop_id'
     )
-    stops_df = pd.DataFrame.from_records(stops_data).rename(
-        columns={'id': 'stop_id'}
-    )
-    # use the model column that stores GTFS stop id (stop_id) so values() returns 'stop_id'
+    stops_df = pd.DataFrame.from_records(stops_data)
+
     stops_data = Stop.objects.filter(stop_id__in=stop_ids).values(
         'stop_id', 'stop_lat', 'stop_lon', 'stop_name'
     )
@@ -235,10 +223,7 @@ def build_vp_training_dataset(
 
     st_df = st_df.merge(stops_df, on='stop_id', how='left')
     print(f"  Added coordinates for {st_df['stop_lat'].notna().sum():,} stops")
-    # st_df = st_df.merge(stops_df, on='stop_id', how='left')
-    # print(f"  Added coordinates for {st_df['stop_lat'].notna().sum():,} stops")
-# ...existing code...
-
+    
 
     # ============================================================
     # STEP 4: For each VP, find remaining stops and distances

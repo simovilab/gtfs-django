@@ -110,6 +110,7 @@ class HistoricalMeanModel:
 
 
 def train_historical_mean(dataset_name: str = "sample_dataset",
+                         route_id: Optional[str] = None,
                          group_by: List[str] = ['route_id', 'stop_sequence', 'hour'],
                          test_size: float = 0.2,
                          save_model: bool = True) -> Dict:
@@ -118,6 +119,7 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
     
     Args:
         dataset_name: Name of dataset in datasets/ directory
+        route_id: Optional route ID for route-specific training
         group_by: List of columns to group by
         test_size: Fraction of data for testing
         save_model: Whether to save to registry
@@ -129,10 +131,25 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
     print(f"Training Historical Mean Model".center(60))
     print(f"{'='*60}\n")
     
+    route_info = f" (route: {route_id})" if route_id else " (global)"
+    print(f"Scope{route_info}")
+    print(f"Group by: {group_by}")
+    
     # Load dataset
-    print(f"Loading dataset: {dataset_name}")
+    print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
+    
+    # Filter by route if specified
+    if route_id is not None:
+        df = dataset.df
+        df_filtered = df[df['route_id'] == route_id].copy()
+        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
+        
+        if len(df_filtered) == 0:
+            raise ValueError(f"No data found for route {route_id}")
+        
+        dataset.df = df_filtered
     
     # Split data temporally
     train_df, val_df, test_df = dataset.temporal_split(
@@ -171,7 +188,10 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
     metadata = {
         'model_type': 'historical_mean',
         'dataset': dataset_name,
+        'route_id': route_id,
         'group_by': group_by,
+        'n_samples': len(train_df) + len(val_df) + len(test_df),
+        'n_trips': dataset.df['trip_id'].nunique() if route_id else None,
         'train_samples': len(train_df),
         'test_samples': len(test_df),
         'unique_groups': len(model.lookup_table),
@@ -185,7 +205,8 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
         model_key = ModelKey.generate(
             model_type='historical_mean',
             dataset_name=dataset_name,
-            feature_groups=['temporal', 'route']
+            feature_groups=['temporal', 'route'],
+            route_id=route_id
         )
         
         registry = get_registry()

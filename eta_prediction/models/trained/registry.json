@@ -94,5 +94,1677 @@
     "meta_path": "models/trained/ewma_GreeD_GreenE_dataset_route-temporal_20251027_161350_alpha=0_3_meta.json",
     "saved_at": "2025-10-27T16:13:50.951525",
     "model_type": "ewma"
+  },
+  "historical_mean_different_routes_route-temporal_20251107_111021": {
+    "model_path": "models/trained/historical_mean_different_routes_route-temporal_20251107_111021.pkl",
+    "meta_path": "models/trained/historical_mean_different_routes_route-temporal_20251107_111021_meta.json",
+    "saved_at": "2025-11-07T11:10:21.492814",
+    "model_type": "historical_mean"
+  },
+  "polyreg_distance_different_routes_distance_20251107_111021_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_different_routes_distance_20251107_111021_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_different_routes_distance_20251107_111021_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-07T11:10:21.704256",
+    "model_type": "polyreg_distance"
+  },
+  "polyreg_time_different_routes_operational-temporal_20251107_111022_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_different_routes_operational-temporal_20251107_111022_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_different_routes_operational-temporal_20251107_111022_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-07T11:10:22.031719",
+    "model_type": "polyreg_time"
+  },
+  "ewma_different_routes_route-temporal_20251107_111028_alpha=0_3": {
+    "model_path": "models/trained/ewma_different_routes_route-temporal_20251107_111028_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_different_routes_route-temporal_20251107_111028_alpha=0_3_meta.json",
+    "saved_at": "2025-11-07T11:10:28.798102",
+    "model_type": "ewma"
+  },
+  "polyreg_distance_different_routes_distance_20251107_111029_degree=2_route_specific=yes": {
+    "model_path": "models/trained/polyreg_distance_different_routes_distance_20251107_111029_degree=2_route_specific=yes.pkl",
+    "meta_path": "models/trained/polyreg_distance_different_routes_distance_20251107_111029_degree=2_route_specific=yes_meta.json",
+    "saved_at": "2025-11-07T11:10:29.019001",
+    "model_type": "polyreg_distance"
+  },
+  "polyreg_distance_different_routes_distance_20251107_111029_degree=3_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_different_routes_distance_20251107_111029_degree=3_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_different_routes_distance_20251107_111029_degree=3_route_specific=no_meta.json",
+    "saved_at": "2025-11-07T11:10:29.180706",
+    "model_type": "polyreg_distance"
+  },
+  "polyreg_time_different_routes_operational-temporal_20251107_111029_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_different_routes_operational-temporal_20251107_111029_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_different_routes_operational-temporal_20251107_111029_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-07T11:10:29.430339",
+    "model_type": "polyreg_time"
+  },
+  "ewma_different_routes_route-temporal_20251107_111036_alpha=0_3": {
+    "model_path": "models/trained/ewma_different_routes_route-temporal_20251107_111036_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_different_routes_route-temporal_20251107_111036_alpha=0_3_meta.json",
+    "saved_at": "2025-11-07T11:10:36.150238",
+    "model_type": "ewma"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_170440": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_170440.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_170440_meta.json",
+    "saved_at": "2025-11-19T17:04:40.923857",
+    "model_type": "historical_mean",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_170441_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_170441_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_170441_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:04:41.396334",
+    "model_type": "polyreg_distance",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_170441_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_170441_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_170441_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:04:41.845429",
+    "model_type": "polyreg_time",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_170445_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_170445_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_170445_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:04:45.922473",
+    "model_type": "ewma",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_170446": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_170446.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_170446_meta.json",
+    "saved_at": "2025-11-19T17:04:46.307867",
+    "model_type": "historical_mean",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_170446_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_170446_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_170446_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:04:46.719846",
+    "model_type": "polyreg_distance",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_170447_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_170447_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_170447_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:04:47.079625",
+    "model_type": "polyreg_time",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_170447_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_170447_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_170447_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:04:47.927069",
+    "model_type": "ewma",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_170448": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_170448.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_170448_meta.json",
+    "saved_at": "2025-11-19T17:04:48.283462",
+    "model_type": "historical_mean",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_170448_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_170448_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_170448_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:04:48.634098",
+    "model_type": "polyreg_distance",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_170448_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_170448_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_170448_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:04:48.996791",
+    "model_type": "polyreg_time",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_170450_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_170450_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_170450_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:04:50.234126",
+    "model_type": "ewma",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_170450": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_170450.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_170450_meta.json",
+    "saved_at": "2025-11-19T17:04:50.607842",
+    "model_type": "historical_mean",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_170450_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_170450_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_170450_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:04:50.964504",
+    "model_type": "polyreg_distance",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_170451_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_170451_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_170451_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:04:51.355541",
+    "model_type": "polyreg_time",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_170453_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_170453_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_170453_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:04:53.428667",
+    "model_type": "ewma",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_170453": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_170453.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_170453_meta.json",
+    "saved_at": "2025-11-19T17:04:53.768432",
+    "model_type": "historical_mean",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_170454_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_170454_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_170454_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:04:54.098806",
+    "model_type": "polyreg_distance",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_170454_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_170454_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_170454_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:04:54.444500",
+    "model_type": "polyreg_time",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_170454_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_170454_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_170454_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:04:54.939576",
+    "model_type": "ewma",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_170455": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_170455.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_170455_meta.json",
+    "saved_at": "2025-11-19T17:04:55.380770",
+    "model_type": "historical_mean",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_170455_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_170455_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_170455_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:04:55.723726",
+    "model_type": "polyreg_distance",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_170456_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_170456_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_170456_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:04:56.127511",
+    "model_type": "polyreg_time",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_170457_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_170457_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_170457_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:04:57.833652",
+    "model_type": "ewma",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_170458": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_170458.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_170458_meta.json",
+    "saved_at": "2025-11-19T17:04:58.302586",
+    "model_type": "historical_mean",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_170458_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_170458_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_170458_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:04:58.726851",
+    "model_type": "polyreg_distance",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_170459_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_170459_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_170459_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:04:59.206400",
+    "model_type": "polyreg_time",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_170506_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_170506_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_170506_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:05:06.937816",
+    "model_type": "ewma",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_170507": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_170507.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_170507_meta.json",
+    "saved_at": "2025-11-19T17:05:07.345646",
+    "model_type": "historical_mean",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_170507_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_170507_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_170507_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:05:07.804435",
+    "model_type": "polyreg_distance",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_170508_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_170508_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_170508_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:05:08.278364",
+    "model_type": "polyreg_time",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_170512_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_170512_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_170512_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:05:12.842317",
+    "model_type": "ewma",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_170513": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_170513.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_170513_meta.json",
+    "saved_at": "2025-11-19T17:05:13.229423",
+    "model_type": "historical_mean",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_170513_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_170513_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_170513_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:05:13.601313",
+    "model_type": "polyreg_distance",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_170513_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_170513_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_170513_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:05:13.965570",
+    "model_type": "polyreg_time",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_170514_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_170514_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_170514_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:05:14.509893",
+    "model_type": "ewma",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_170514": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_170514.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_170514_meta.json",
+    "saved_at": "2025-11-19T17:05:14.913454",
+    "model_type": "historical_mean",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_170515_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_170515_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_170515_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:05:15.278200",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_170515_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_170515_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_170515_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:05:15.701554",
+    "model_type": "polyreg_time",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_170518_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_170518_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_170518_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:05:18.429888",
+    "model_type": "ewma",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_170518": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_170518.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_170518_meta.json",
+    "saved_at": "2025-11-19T17:05:18.859253",
+    "model_type": "historical_mean",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_170519_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_170519_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_170519_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:05:19.200225",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_170519_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_170519_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_170519_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:05:19.580829",
+    "model_type": "polyreg_time",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_170521_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_170521_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_170521_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:05:21.641006",
+    "model_type": "ewma",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_170522": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_170522.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_170522_meta.json",
+    "saved_at": "2025-11-19T17:05:22.024320",
+    "model_type": "historical_mean",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_170522_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_170522_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_170522_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:05:22.382673",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_170522_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_170522_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_170522_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:05:22.790587",
+    "model_type": "polyreg_time",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_170525_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_170525_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_170525_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:05:25.823318",
+    "model_type": "ewma",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_170526": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_170526.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_170526_meta.json",
+    "saved_at": "2025-11-19T17:05:26.210009",
+    "model_type": "historical_mean",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_170526_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_170526_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_170526_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:05:26.572267",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_170526_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_170526_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_170526_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:05:26.976113",
+    "model_type": "polyreg_time",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_170530_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_170530_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_170530_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:05:30.547621",
+    "model_type": "ewma",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_global_20251119_174639": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_global_20251119_174639.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_global_20251119_174639_meta.json",
+    "saved_at": "2025-11-19T17:46:39.947275",
+    "model_type": "historical_mean",
+    "route_id": null,
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_global_20251119_174640_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_global_20251119_174640_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_global_20251119_174640_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:46:40.492606",
+    "model_type": "polyreg_distance",
+    "route_id": null,
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_global_20251119_174641_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_global_20251119_174641_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_global_20251119_174641_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:46:41.325671",
+    "model_type": "polyreg_time",
+    "route_id": null,
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_global_20251119_174706_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_global_20251119_174706_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_global_20251119_174706_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:47:06.746672",
+    "model_type": "ewma",
+    "route_id": null,
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_175548": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_175548.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_175548_meta.json",
+    "saved_at": "2025-11-19T17:55:48.208647",
+    "model_type": "historical_mean",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_175548_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_175548_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_175548_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:55:48.585100",
+    "model_type": "polyreg_distance",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_175549_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_175549_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_175549_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:55:49.011731",
+    "model_type": "polyreg_time",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_175552_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_175552_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_175552_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:55:52.754160",
+    "model_type": "ewma",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_175553": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_175553.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_175553_meta.json",
+    "saved_at": "2025-11-19T17:55:53.111870",
+    "model_type": "historical_mean",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_175553_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_175553_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_175553_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:55:53.442027",
+    "model_type": "polyreg_distance",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_175553_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_175553_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_175553_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:55:53.851997",
+    "model_type": "polyreg_time",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_175554_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_175554_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_175554_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:55:54.678074",
+    "model_type": "ewma",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_175555": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_175555.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_175555_meta.json",
+    "saved_at": "2025-11-19T17:55:55.022724",
+    "model_type": "historical_mean",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_175555_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_175555_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_175555_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:55:55.366164",
+    "model_type": "polyreg_distance",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_175555_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_175555_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_175555_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:55:55.733275",
+    "model_type": "polyreg_time",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_175556_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_175556_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_175556_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:55:56.814638",
+    "model_type": "ewma",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_175557": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_175557.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_175557_meta.json",
+    "saved_at": "2025-11-19T17:55:57.195097",
+    "model_type": "historical_mean",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_175557_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_175557_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_175557_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:55:57.534873",
+    "model_type": "polyreg_distance",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_175557_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_175557_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_175557_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:55:57.898777",
+    "model_type": "polyreg_time",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_175600_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_175600_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_175600_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:00.073212",
+    "model_type": "ewma",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_175600": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_175600.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_175600_meta.json",
+    "saved_at": "2025-11-19T17:56:00.459489",
+    "model_type": "historical_mean",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_175600_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_175600_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_175600_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:00.796635",
+    "model_type": "polyreg_distance",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_175601_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_175601_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_175601_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:01.137759",
+    "model_type": "polyreg_time",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_175601_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_175601_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_175601_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:01.623552",
+    "model_type": "ewma",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_175601": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_175601.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_175601_meta.json",
+    "saved_at": "2025-11-19T17:56:01.999951",
+    "model_type": "historical_mean",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_175602_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_175602_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_175602_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:02.356304",
+    "model_type": "polyreg_distance",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_175602_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_175602_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_175602_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:02.729610",
+    "model_type": "polyreg_time",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_175603_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_175603_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_175603_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:03.937372",
+    "model_type": "ewma",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_175604": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_175604.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_175604_meta.json",
+    "saved_at": "2025-11-19T17:56:04.362569",
+    "model_type": "historical_mean",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_175604_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_175604_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_175604_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:04.780413",
+    "model_type": "polyreg_distance",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_175605_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_175605_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_175605_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:05.250681",
+    "model_type": "polyreg_time",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_175611_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_175611_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_175611_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:11.030243",
+    "model_type": "ewma",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_175611": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_175611.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_175611_meta.json",
+    "saved_at": "2025-11-19T17:56:11.427522",
+    "model_type": "historical_mean",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_175611_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_175611_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_175611_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:11.788317",
+    "model_type": "polyreg_distance",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_175612_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_175612_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_175612_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:12.193849",
+    "model_type": "polyreg_time",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_175615_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_175615_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_175615_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:15.463436",
+    "model_type": "ewma",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_175615": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_175615.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_175615_meta.json",
+    "saved_at": "2025-11-19T17:56:15.859827",
+    "model_type": "historical_mean",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_175616_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_175616_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_175616_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:16.196204",
+    "model_type": "polyreg_distance",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_175616_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_175616_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_175616_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:16.634223",
+    "model_type": "polyreg_time",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_175617_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_175617_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_175617_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:17.287943",
+    "model_type": "ewma",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_175617": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_175617.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_175617_meta.json",
+    "saved_at": "2025-11-19T17:56:17.710924",
+    "model_type": "historical_mean",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_175618_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_175618_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_175618_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:18.075745",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_175618_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_175618_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_175618_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:18.476173",
+    "model_type": "polyreg_time",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_175621_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_175621_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_175621_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:21.020284",
+    "model_type": "ewma",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_175621": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_175621.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_175621_meta.json",
+    "saved_at": "2025-11-19T17:56:21.403822",
+    "model_type": "historical_mean",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_175621_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_175621_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_175621_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:21.744773",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_175622_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_175622_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_175622_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:22.144113",
+    "model_type": "polyreg_time",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_175624_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_175624_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_175624_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:24.178348",
+    "model_type": "ewma",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_175624": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_175624.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_175624_meta.json",
+    "saved_at": "2025-11-19T17:56:24.585917",
+    "model_type": "historical_mean",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_175624_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_175624_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_175624_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:24.983136",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_175625_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_175625_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_175625_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:25.407116",
+    "model_type": "polyreg_time",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_175628_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_175628_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_175628_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:28.482500",
+    "model_type": "ewma",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_175628": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_175628.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_175628_meta.json",
+    "saved_at": "2025-11-19T17:56:28.900574",
+    "model_type": "historical_mean",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_175629_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_175629_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_175629_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T17:56:29.295739",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_175629_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_175629_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_175629_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T17:56:29.717433",
+    "model_type": "polyreg_time",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_175633_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_175633_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_175633_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T17:56:33.024525",
+    "model_type": "ewma",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214715": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214715.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214715_meta.json",
+    "saved_at": "2025-11-19T21:47:15.073694",
+    "model_type": "historical_mean",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_214715_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_214715_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_214715_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:15.433053",
+    "model_type": "polyreg_distance",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_214715_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_214715_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_214715_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:15.841680",
+    "model_type": "polyreg_time",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214720_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214720_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214720_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:20.025564",
+    "model_type": "ewma",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214720": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214720.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214720_meta.json",
+    "saved_at": "2025-11-19T21:47:20.369814",
+    "model_type": "historical_mean",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_214720_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_214720_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_214720_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:20.679582",
+    "model_type": "polyreg_distance",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_214720_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_214720_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_214720_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:20.996531",
+    "model_type": "polyreg_time",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214721_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214721_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214721_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:21.735494",
+    "model_type": "ewma",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214722": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214722.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214722_meta.json",
+    "saved_at": "2025-11-19T21:47:22.070016",
+    "model_type": "historical_mean",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_214722_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_214722_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_214722_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:22.385357",
+    "model_type": "polyreg_distance",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_214722_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_214722_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_214722_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:22.722081",
+    "model_type": "polyreg_time",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214723_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214723_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214723_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:23.789497",
+    "model_type": "ewma",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214724": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214724.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214724_meta.json",
+    "saved_at": "2025-11-19T21:47:24.132222",
+    "model_type": "historical_mean",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_214724_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_214724_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_214724_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:24.462657",
+    "model_type": "polyreg_distance",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_214724_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_214724_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_214724_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:24.884475",
+    "model_type": "polyreg_time",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214726_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214726_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214726_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:26.925955",
+    "model_type": "ewma",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214742": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214742.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214742_meta.json",
+    "saved_at": "2025-11-19T21:47:42.922968",
+    "model_type": "historical_mean",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_214743_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_214743_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_16_20251119_214743_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:43.287915",
+    "model_type": "polyreg_distance",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_214743_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_214743_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_16_20251119_214743_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:43.688867",
+    "model_type": "polyreg_time",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214747_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214747_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_16_20251119_214747_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:47.394847",
+    "model_type": "ewma",
+    "route_id": "16",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214747": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214747.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214747_meta.json",
+    "saved_at": "2025-11-19T21:47:47.709087",
+    "model_type": "historical_mean",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_214748_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_214748_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_18_20251119_214748_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:48.015656",
+    "model_type": "polyreg_distance",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_214748_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_214748_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_18_20251119_214748_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:48.351948",
+    "model_type": "polyreg_time",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214749_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214749_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_18_20251119_214749_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:49.309665",
+    "model_type": "ewma",
+    "route_id": "18",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214749": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214749.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214749_meta.json",
+    "saved_at": "2025-11-19T21:47:49.678961",
+    "model_type": "historical_mean",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_214749_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_214749_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_29_20251119_214749_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:49.994147",
+    "model_type": "polyreg_distance",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_214750_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_214750_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_29_20251119_214750_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:50.340632",
+    "model_type": "polyreg_time",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214751_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214751_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_29_20251119_214751_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:51.371475",
+    "model_type": "ewma",
+    "route_id": "29",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214751": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214751.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214751_meta.json",
+    "saved_at": "2025-11-19T21:47:51.719890",
+    "model_type": "historical_mean",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_214752_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_214752_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_31_20251119_214752_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:52.033077",
+    "model_type": "polyreg_distance",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_214752_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_214752_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_31_20251119_214752_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:52.385916",
+    "model_type": "polyreg_time",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214754_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214754_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_31_20251119_214754_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:54.192855",
+    "model_type": "ewma",
+    "route_id": "31",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_214754": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_214754.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_428_20251119_214754_meta.json",
+    "saved_at": "2025-11-19T21:47:54.519005",
+    "model_type": "historical_mean",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_214754_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_214754_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_428_20251119_214754_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:54.832927",
+    "model_type": "polyreg_distance",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_214755_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_214755_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_428_20251119_214755_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:55.175654",
+    "model_type": "polyreg_time",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_214755_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_214755_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_428_20251119_214755_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:55.638837",
+    "model_type": "ewma",
+    "route_id": "428",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_214755": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_214755.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_436_20251119_214755_meta.json",
+    "saved_at": "2025-11-19T21:47:55.970081",
+    "model_type": "historical_mean",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_214756_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_214756_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_436_20251119_214756_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:56.291731",
+    "model_type": "polyreg_distance",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_214756_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_214756_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_436_20251119_214756_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:56.652140",
+    "model_type": "polyreg_time",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_214757_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_214757_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_436_20251119_214757_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:47:57.797933",
+    "model_type": "ewma",
+    "route_id": "436",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_214758": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_214758.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_66_20251119_214758_meta.json",
+    "saved_at": "2025-11-19T21:47:58.236442",
+    "model_type": "historical_mean",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_214758_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_214758_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_66_20251119_214758_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:47:58.668111",
+    "model_type": "polyreg_distance",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_214759_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_214759_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_66_20251119_214759_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:47:59.235160",
+    "model_type": "polyreg_time",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_214805_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_214805_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_66_20251119_214805_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:48:05.322655",
+    "model_type": "ewma",
+    "route_id": "66",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_214805": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_214805.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_9_20251119_214805_meta.json",
+    "saved_at": "2025-11-19T21:48:05.722316",
+    "model_type": "historical_mean",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_214806_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_214806_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_9_20251119_214806_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:48:06.175873",
+    "model_type": "polyreg_distance",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_214806_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_214806_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_9_20251119_214806_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:48:06.585448",
+    "model_type": "polyreg_time",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_214810_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_214810_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_9_20251119_214810_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:48:10.117719",
+    "model_type": "ewma",
+    "route_id": "9",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_214810": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_214810.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_214810_meta.json",
+    "saved_at": "2025-11-19T21:48:10.458004",
+    "model_type": "historical_mean",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_214810_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_214810_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_CR-Fairmount_20251119_214810_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:48:10.796209",
+    "model_type": "polyreg_distance",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_214811_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_214811_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_CR-Fairmount_20251119_214811_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:48:11.159193",
+    "model_type": "polyreg_time",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_214811_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_214811_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_CR-Fairmount_20251119_214811_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:48:11.698047",
+    "model_type": "ewma",
+    "route_id": "CR-Fairmount",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_214812": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_214812.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_214812_meta.json",
+    "saved_at": "2025-11-19T21:48:12.088311",
+    "model_type": "historical_mean",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_214812_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_214812_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-B_20251119_214812_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:48:12.442689",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_214812_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_214812_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-B_20251119_214812_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:48:12.833654",
+    "model_type": "polyreg_time",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_214815_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_214815_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-B_20251119_214815_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:48:15.823343",
+    "model_type": "ewma",
+    "route_id": "Green-B",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_214816": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_214816.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_214816_meta.json",
+    "saved_at": "2025-11-19T21:48:16.210879",
+    "model_type": "historical_mean",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_214816_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_214816_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-C_20251119_214816_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:48:16.575636",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_214816_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_214816_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-C_20251119_214816_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:48:16.975633",
+    "model_type": "polyreg_time",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_214819_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_214819_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-C_20251119_214819_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:48:19.038815",
+    "model_type": "ewma",
+    "route_id": "Green-C",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_214819": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_214819.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_214819_meta.json",
+    "saved_at": "2025-11-19T21:48:19.639886",
+    "model_type": "historical_mean",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_214820_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_214820_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-D_20251119_214820_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:48:20.103933",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_214820_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_214820_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-D_20251119_214820_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:48:20.664630",
+    "model_type": "polyreg_time",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_214825_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_214825_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-D_20251119_214825_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:48:25.260676",
+    "model_type": "ewma",
+    "route_id": "Green-D",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_214825": {
+    "model_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_214825.pkl",
+    "meta_path": "models/trained/historical_mean_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_214825_meta.json",
+    "saved_at": "2025-11-19T21:48:25.737850",
+    "model_type": "historical_mean",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_214826_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_214826_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_3000_1000_100_10_dataset_distance_route_Green-E_20251119_214826_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T21:48:26.172090",
+    "model_type": "polyreg_distance",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_214826_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_214826_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_3000_1000_100_10_dataset_operational-temporal_route_Green-E_20251119_214826_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T21:48:26.670684",
+    "model_type": "polyreg_time",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_214829_alpha=0_3": {
+    "model_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_214829_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_3000_1000_100_10_dataset_route-temporal_route_Green-E_20251119_214829_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T21:48:29.922047",
+    "model_type": "ewma",
+    "route_id": "Green-E",
+    "dataset": "3000_1000_100_10_dataset"
+  },
+  "historical_mean_GreenB_dataset_route-temporal_global_20251119_220908": {
+    "model_path": "models/trained/historical_mean_GreenB_dataset_route-temporal_global_20251119_220908.pkl",
+    "meta_path": "models/trained/historical_mean_GreenB_dataset_route-temporal_global_20251119_220908_meta.json",
+    "saved_at": "2025-11-19T22:09:08.661207",
+    "model_type": "historical_mean",
+    "route_id": null,
+    "dataset": "GreenB_dataset"
+  },
+  "polyreg_distance_GreenB_dataset_distance_global_20251119_220908_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_GreenB_dataset_distance_global_20251119_220908_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_GreenB_dataset_distance_global_20251119_220908_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T22:09:08.751436",
+    "model_type": "polyreg_distance",
+    "route_id": null,
+    "dataset": "GreenB_dataset"
+  },
+  "polyreg_time_GreenB_dataset_operational-temporal_global_20251119_220908_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_GreenB_dataset_operational-temporal_global_20251119_220908_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_GreenB_dataset_operational-temporal_global_20251119_220908_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T22:09:08.919564",
+    "model_type": "polyreg_time",
+    "route_id": null,
+    "dataset": "GreenB_dataset"
+  },
+  "historical_mean_GreenB_dataset_route-temporal_global_20251119_220921": {
+    "model_path": "models/trained/historical_mean_GreenB_dataset_route-temporal_global_20251119_220921.pkl",
+    "meta_path": "models/trained/historical_mean_GreenB_dataset_route-temporal_global_20251119_220921_meta.json",
+    "saved_at": "2025-11-19T22:09:21.717794",
+    "model_type": "historical_mean",
+    "route_id": null,
+    "dataset": "GreenB_dataset"
+  },
+  "polyreg_distance_GreenB_dataset_distance_global_20251119_220921_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_GreenB_dataset_distance_global_20251119_220921_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_GreenB_dataset_distance_global_20251119_220921_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T22:09:21.782792",
+    "model_type": "polyreg_distance",
+    "route_id": null,
+    "dataset": "GreenB_dataset"
+  },
+  "polyreg_time_GreenB_dataset_operational-temporal_global_20251119_220921_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_GreenB_dataset_operational-temporal_global_20251119_220921_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_GreenB_dataset_operational-temporal_global_20251119_220921_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T22:09:21.881827",
+    "model_type": "polyreg_time",
+    "route_id": null,
+    "dataset": "GreenB_dataset"
+  },
+  "ewma_GreenB_dataset_route-temporal_global_20251119_220924_alpha=0_3": {
+    "model_path": "models/trained/ewma_GreenB_dataset_route-temporal_global_20251119_220924_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_GreenB_dataset_route-temporal_global_20251119_220924_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T22:09:24.336397",
+    "model_type": "ewma",
+    "route_id": null,
+    "dataset": "GreenB_dataset"
+  },
+  "historical_mean_9_dataset_route-temporal_global_20251119_220943": {
+    "model_path": "models/trained/historical_mean_9_dataset_route-temporal_global_20251119_220943.pkl",
+    "meta_path": "models/trained/historical_mean_9_dataset_route-temporal_global_20251119_220943_meta.json",
+    "saved_at": "2025-11-19T22:09:43.439768",
+    "model_type": "historical_mean",
+    "route_id": null,
+    "dataset": "9_dataset"
+  },
+  "polyreg_distance_9_dataset_distance_global_20251119_220943_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_9_dataset_distance_global_20251119_220943_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_9_dataset_distance_global_20251119_220943_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T22:09:43.521804",
+    "model_type": "polyreg_distance",
+    "route_id": null,
+    "dataset": "9_dataset"
+  },
+  "polyreg_time_9_dataset_operational-temporal_global_20251119_220943_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_9_dataset_operational-temporal_global_20251119_220943_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_9_dataset_operational-temporal_global_20251119_220943_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T22:09:43.640288",
+    "model_type": "polyreg_time",
+    "route_id": null,
+    "dataset": "9_dataset"
+  },
+  "ewma_9_dataset_route-temporal_global_20251119_220946_alpha=0_3": {
+    "model_path": "models/trained/ewma_9_dataset_route-temporal_global_20251119_220946_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_9_dataset_route-temporal_global_20251119_220946_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T22:09:46.366037",
+    "model_type": "ewma",
+    "route_id": null,
+    "dataset": "9_dataset"
+  },
+  "historical_mean_18_dataset_route-temporal_global_20251119_220956": {
+    "model_path": "models/trained/historical_mean_18_dataset_route-temporal_global_20251119_220956.pkl",
+    "meta_path": "models/trained/historical_mean_18_dataset_route-temporal_global_20251119_220956_meta.json",
+    "saved_at": "2025-11-19T22:09:56.546618",
+    "model_type": "historical_mean",
+    "route_id": null,
+    "dataset": "18_dataset"
+  },
+  "polyreg_distance_18_dataset_distance_global_20251119_220956_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_18_dataset_distance_global_20251119_220956_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_18_dataset_distance_global_20251119_220956_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T22:09:56.580725",
+    "model_type": "polyreg_distance",
+    "route_id": null,
+    "dataset": "18_dataset"
+  },
+  "polyreg_time_18_dataset_operational-temporal_global_20251119_220956_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_18_dataset_operational-temporal_global_20251119_220956_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_18_dataset_operational-temporal_global_20251119_220956_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T22:09:56.634674",
+    "model_type": "polyreg_time",
+    "route_id": null,
+    "dataset": "18_dataset"
+  },
+  "ewma_18_dataset_route-temporal_global_20251119_220957_alpha=0_3": {
+    "model_path": "models/trained/ewma_18_dataset_route-temporal_global_20251119_220957_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_18_dataset_route-temporal_global_20251119_220957_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T22:09:57.141138",
+    "model_type": "ewma",
+    "route_id": null,
+    "dataset": "18_dataset"
+  },
+  "historical_mean_171_dataset_route-temporal_global_20251119_221009": {
+    "model_path": "models/trained/historical_mean_171_dataset_route-temporal_global_20251119_221009.pkl",
+    "meta_path": "models/trained/historical_mean_171_dataset_route-temporal_global_20251119_221009_meta.json",
+    "saved_at": "2025-11-19T22:10:09.734027",
+    "model_type": "historical_mean",
+    "route_id": null,
+    "dataset": "171_dataset"
+  },
+  "polyreg_distance_171_dataset_distance_global_20251119_221009_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_171_dataset_distance_global_20251119_221009_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_171_dataset_distance_global_20251119_221009_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T22:10:09.759129",
+    "model_type": "polyreg_distance",
+    "route_id": null,
+    "dataset": "171_dataset"
+  },
+  "polyreg_time_171_dataset_operational-temporal_global_20251119_221009_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_171_dataset_operational-temporal_global_20251119_221009_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_171_dataset_operational-temporal_global_20251119_221009_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T22:10:09.793533",
+    "model_type": "polyreg_time",
+    "route_id": null,
+    "dataset": "171_dataset"
+  },
+  "ewma_171_dataset_route-temporal_global_20251119_221009_alpha=0_3": {
+    "model_path": "models/trained/ewma_171_dataset_route-temporal_global_20251119_221009_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_171_dataset_route-temporal_global_20251119_221009_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T22:10:09.838436",
+    "model_type": "ewma",
+    "route_id": null,
+    "dataset": "171_dataset"
+  },
+  "historical_mean_746_dataset_route-temporal_global_20251119_221435": {
+    "model_path": "models/trained/historical_mean_746_dataset_route-temporal_global_20251119_221435.pkl",
+    "meta_path": "models/trained/historical_mean_746_dataset_route-temporal_global_20251119_221435_meta.json",
+    "saved_at": "2025-11-19T22:14:35.782469",
+    "model_type": "historical_mean",
+    "route_id": null,
+    "dataset": "746_dataset"
+  },
+  "polyreg_distance_746_dataset_distance_global_20251119_221435_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_746_dataset_distance_global_20251119_221435_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_746_dataset_distance_global_20251119_221435_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T22:14:35.814065",
+    "model_type": "polyreg_distance",
+    "route_id": null,
+    "dataset": "746_dataset"
+  },
+  "polyreg_time_746_dataset_operational-temporal_global_20251119_221435_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_746_dataset_operational-temporal_global_20251119_221435_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_746_dataset_operational-temporal_global_20251119_221435_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T22:14:35.849973",
+    "model_type": "polyreg_time",
+    "route_id": null,
+    "dataset": "746_dataset"
+  },
+  "ewma_746_dataset_route-temporal_global_20251119_221436_alpha=0_3": {
+    "model_path": "models/trained/ewma_746_dataset_route-temporal_global_20251119_221436_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_746_dataset_route-temporal_global_20251119_221436_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T22:14:36.035425",
+    "model_type": "ewma",
+    "route_id": null,
+    "dataset": "746_dataset"
+  },
+  "historical_mean_746_dataset_route-temporal_route_746_20251119_221452": {
+    "model_path": "models/trained/historical_mean_746_dataset_route-temporal_route_746_20251119_221452.pkl",
+    "meta_path": "models/trained/historical_mean_746_dataset_route-temporal_route_746_20251119_221452_meta.json",
+    "saved_at": "2025-11-19T22:14:52.242981",
+    "model_type": "historical_mean",
+    "route_id": "746",
+    "dataset": "746_dataset"
+  },
+  "polyreg_distance_746_dataset_distance_route_746_20251119_221452_degree=2_route_specific=no": {
+    "model_path": "models/trained/polyreg_distance_746_dataset_distance_route_746_20251119_221452_degree=2_route_specific=no.pkl",
+    "meta_path": "models/trained/polyreg_distance_746_dataset_distance_route_746_20251119_221452_degree=2_route_specific=no_meta.json",
+    "saved_at": "2025-11-19T22:14:52.266721",
+    "model_type": "polyreg_distance",
+    "route_id": "746",
+    "dataset": "746_dataset"
+  },
+  "polyreg_time_746_dataset_operational-temporal_route_746_20251119_221452_degree=2_handle_nan=drop": {
+    "model_path": "models/trained/polyreg_time_746_dataset_operational-temporal_route_746_20251119_221452_degree=2_handle_nan=drop.pkl",
+    "meta_path": "models/trained/polyreg_time_746_dataset_operational-temporal_route_746_20251119_221452_degree=2_handle_nan=drop_meta.json",
+    "saved_at": "2025-11-19T22:14:52.306207",
+    "model_type": "polyreg_time",
+    "route_id": "746",
+    "dataset": "746_dataset"
+  },
+  "ewma_746_dataset_route-temporal_route_746_20251119_221452_alpha=0_3": {
+    "model_path": "models/trained/ewma_746_dataset_route-temporal_route_746_20251119_221452_alpha=0_3.pkl",
+    "meta_path": "models/trained/ewma_746_dataset_route-temporal_route_746_20251119_221452_alpha=0_3_meta.json",
+    "saved_at": "2025-11-19T22:14:52.559195",
+    "model_type": "ewma",
+    "route_id": "746",
+    "dataset": "746_dataset"
   }
 }

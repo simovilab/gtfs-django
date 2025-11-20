@@ -15,6 +15,7 @@ dependencies = [
   "numpy>=2.3.4",
   "pandas>=2.3.3",
   "fastparquet>=2024.11.0",
+  "scikit-learn>=1.7.2",
 ]
 
 [project.optional-dependencies]
@@ -23,3 +24,8 @@ dev = ["ipython", "black", "pytest", "pytest-django", "mypy"]
 [tool.black]
 line-length = 100
 target-version = ["py311"]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]

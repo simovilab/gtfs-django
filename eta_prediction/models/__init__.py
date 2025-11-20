@@ -47,7 +47,8 @@ from .evaluation.leaderboard import ModelLeaderboard, quick_compare
 from .evaluation.roll_validate import RollingValidator, quick_rolling_validate
 
 # Main training pipeline
-from .train_all_models import train_all_baselines, train_advanced_configurations
+# from .train_all_models import train_all_baselines, train_advanced_configurations
+from .train_all_models import train_all_models
 
 
 __all__ = [
@@ -79,7 +80,8 @@ __all__ = [
     'train_polyreg_distance',
     'train_polyreg_time',
     'train_ewma',
-    'train_all_baselines',
+    # 'train_all_baselines',
+    'train_all_models'
     'train_advanced_configurations',
     
     # Prediction

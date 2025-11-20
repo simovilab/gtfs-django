@@ -1,374 +1,286 @@
 """
-Main training script for all ETA prediction models.
-Trains multiple model types and compares performance.
-Updated with robust NaN handling.
+Train all models either globally or per-route for comparative analysis.
 """
 
 import argparse
 import sys
 from pathlib import Path
+import pandas as pd
 
-# Add models directory to path
 sys.path.append(str(Path(__file__).parent))
 
+from common.data import load_dataset
 from historical_mean.train import train_historical_mean
 from polyreg_distance.train import train_polyreg_distance
 from polyreg_time.train import train_polyreg_time
 from ewma.train import train_ewma
-from evaluation.leaderboard import quick_compare
-from common.registry import get_registry
 
 
-def train_all_baselines(dataset_name: str = "sample_dataset",
-                        save_models: bool = True,
-                        handle_nan: str = 'drop'):
+def train_all_models(dataset_name: str,
+                    by_route: bool = False,
+                    model_types: list = None,
+                    save: bool = True):
     """
-    Train all baseline models with robust NaN handling.
+    Train all baseline models, optionally per-route.
     
     Args:
         dataset_name: Dataset to train on
-        save_models: Whether to save models to registry
-        handle_nan: How to handle NaN - 'drop' or 'impute'
+        by_route: If True, train separate model for each route
+        model_types: List of model types to train (None = all)
+        save: Whether to save models to registry
+    """
+    
+    if model_types is None:
+        model_types = ['historical_mean', 'polyreg_distance', 'polyreg_time', 'ewma']
+    
+    print(f"\n{'='*80}")
+    print(f"TRAINING ALL MODELS".center(80))
+    print(f"{'='*80}")
+    print(f"Dataset: {dataset_name}")
+    print(f"Mode: {'Route-Specific' if by_route else 'Global'}")
+    print(f"Models: {', '.join(model_types)}")
+    print(f"Save: {save}")
+    print(f"{'='*80}\n")
+    
+    # Load dataset to get routes
+    dataset = load_dataset(dataset_name)
+    
+    if by_route:
+        routes = sorted(dataset.df['route_id'].unique())
+        print(f"Found {len(routes)} routes: {routes}\n")
         
-    Returns:
-        Dictionary of trained models and their keys
-    """
-    print("\n" + "="*80)
-    print("TRAINING ALL BASELINE MODELS".center(80))
-    print("="*80 + "\n")
-    print(f"NaN Handling Strategy: {handle_nan}")
-    
-    models = {}
-    
-    # 1. Historical Mean (simplest baseline)
-    print("\n[1/4] Historical Mean Model")
-    print("-" * 80)
-    try:
-        result = train_historical_mean(
-            dataset_name=dataset_name,
-            group_by=['route_id', 'stop_sequence', 'hour'],
-            save_model=save_models
-        )
-        models['historical_mean'] = result
-        print("✓ Historical Mean trained successfully")
-    except Exception as e:
-        print(f"✗ Historical Mean failed: {e}")
-    
-    # 2. Polynomial Regression - Distance Only
-    print("\n[2/4] Polynomial Regression Distance Model")
-    print("-" * 80)
-    try:
-        result = train_polyreg_distance(
-            dataset_name=dataset_name,
-            degree=2,
-            alpha=1.0,
-            route_specific=False,
-            save_model=save_models
-        )
-        models['polyreg_distance'] = result
-        print("✓ Polynomial Regression Distance trained successfully")
-        if save_models and 'model_key' in result.get('metadata', {}):
-            print(f"   Saved as: {result['metadata']['model_key']}")
-    except Exception as e:
-        print(f"✗ Polynomial Regression Distance failed: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    # 3. Polynomial Regression - Time Enhanced
-    print("\n[3/4] Polynomial Regression Time Model")
-    print("-" * 80)
-    try:
-        result = train_polyreg_time(
-            dataset_name=dataset_name,
-            poly_degree=2,
-            alpha=1.0,
-            include_temporal=True,
-            include_operational=True,
-            include_weather=False,
-            handle_nan=handle_nan,  # Use configurable NaN handling
-            save_model=save_models
-        )
-        models['polyreg_time'] = result
-        print("✓ Polynomial Regression Time trained successfully")
-    except Exception as e:
-        print(f"✗ Polynomial Regression Time failed: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    # 4. EWMA (adaptive baseline)
-    print("\n[4/4] EWMA Model")
-    print("-" * 80)
-    try:
-        result = train_ewma(
-            dataset_name=dataset_name,
-            alpha=0.3,
-            group_by=['route_id', 'stop_sequence'],
-            save_model=save_models
-        )
-        models['ewma'] = result
-        print("✓ EWMA trained successfully")
-    except Exception as e:
-        print(f"✗ EWMA failed: {e}")
-    
-    # Summary
-    print("\n" + "="*80)
-    print(f"Training Summary: {len(models)}/4 models trained successfully")
-    print("="*80)
-    
-    return models
-
-
-def compare_all_models(models: dict):
-    """
-    Compare all trained models.
-    
-    Args:
-        models: Dictionary of model results
-    """
-    if not models:
-        print("\n⚠️  No models to compare")
-        return None
-    
-    print("\n" + "="*80)
-    print("MODEL COMPARISON".center(80))
-    print("="*80 + "\n")
-    
-    # Extract metrics
-    comparison = []
-    for model_type, result in models.items():
-        metrics = result['metrics']
-        comparison.append({
-            'model': model_type,
-            'test_mae_min': metrics.get('test_mae_minutes', 0),
-            'test_rmse_min': metrics.get('test_rmse_minutes', 0),
-            'test_r2': metrics.get('test_r2', 0),
-            'test_within_60s': metrics.get('test_within_60s', 0) * 100,
-            'test_bias_sec': metrics.get('test_bias_seconds', 0)
+        # Get trip counts per route for summary
+        route_stats = dataset.df.groupby('route_id').agg({
+            'trip_id': 'nunique',
+            'time_to_arrival_seconds': 'count'
+        }).rename(columns={
+            'trip_id': 'n_trips',
+            'time_to_arrival_seconds': 'n_samples'
         })
-    
-    import pandas as pd
-    df = pd.DataFrame(comparison)
-    df = df.sort_values('test_mae_min')
-    
-    print("\nRanking by Test MAE:")
-    print("-" * 80)
-    print(df.to_string(index=False))
-    
-    # Highlight best
-    best = df.iloc[0]
-    print(f"\n🏆 Winner: {best['model']}")
-    print(f"   MAE: {best['test_mae_min']:.3f} minutes")
-    print(f"   RMSE: {best['test_rmse_min']:.3f} minutes")
-    print(f"   R²: {best['test_r2']:.3f}")
-    print(f"   Within 60s: {best['test_within_60s']:.1f}%")
-    
-    # Calculate improvements
-    if len(df) > 1:
-        worst = df.iloc[-1]
-        improvement = (worst['test_mae_min'] - best['test_mae_min']) / worst['test_mae_min'] * 100
-        print(f"\n📈 Improvement from baseline: {improvement:.1f}% reduction in MAE")
-    
-    return df
-
-
-def train_advanced_configurations(dataset_name: str = "sample_dataset",
-                                  handle_nan: str = 'drop'):
-    """
-    Train advanced model configurations.
-    
-    Args:
-        dataset_name: Dataset to train on
-        handle_nan: NaN handling strategy
         
-    Returns:
-        Dictionary of results
-    """
-    print("\n" + "="*80)
-    print("TRAINING ADVANCED CONFIGURATIONS".center(80))
-    print("="*80 + "\n")
+        print("Route Statistics:")
+        print(route_stats.to_string())
+        print()
+        
+        # Train models for each route
+        results = {}
+        
+        for route_id in routes:
+            n_trips = route_stats.loc[route_id, 'n_trips']
+            n_samples = route_stats.loc[route_id, 'n_samples']
+            
+            print(f"\n{'#'*80}")
+            print(f"ROUTE {route_id} ({n_trips} trips, {n_samples} samples)".center(80))
+            print(f"{'#'*80}\n")
+            
+            route_results = {}
+            
+            try:
+                if 'historical_mean' in model_types:
+                    print(f"\n>>> Training Historical Mean for route {route_id}...")
+                    result = train_historical_mean(
+                        dataset_name=dataset_name,
+                        route_id=route_id,
+                        save_model=save
+                    )
+                    route_results['historical_mean'] = result
+                    
+                if 'polyreg_distance' in model_types:
+                    print(f"\n>>> Training PolyReg Distance for route {route_id}...")
+                    result = train_polyreg_distance(
+                        dataset_name=dataset_name,
+                        route_id=route_id,
+                        degree=2,
+                        save_model=save
+                    )
+                    route_results['polyreg_distance'] = result
+                    
+                if 'polyreg_time' in model_types:
+                    print(f"\n>>> Training PolyReg Time for route {route_id}...")
+                    result = train_polyreg_time(
+                        dataset_name=dataset_name,
+                        route_id=route_id,
+                        poly_degree=2,
+                        include_temporal=True,
+                        include_operational=True,
+                        save_model=save
+                    )
+                    route_results['polyreg_time'] = result
+                    
+                if 'ewma' in model_types:
+                    print(f"\n>>> Training EWMA for route {route_id}...")
+                    result = train_ewma(
+                        dataset_name=dataset_name,
+                        route_id=route_id,
+                        alpha=0.3,
+                        save_model=save
+                    )
+                    route_results['ewma'] = result
+                
+                results[route_id] = route_results
+                
+            except Exception as e:
+                print(f"\n❌ ERROR training models for route {route_id}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # Print summary
+        print(f"\n{'='*80}")
+        print("TRAINING SUMMARY".center(80))
+        print(f"{'='*80}\n")
+        
+        summary_data = []
+        for route_id in routes:
+            if route_id not in results:
+                continue
+            
+            n_trips = route_stats.loc[route_id, 'n_trips']
+            
+            for model_type in model_types:
+                if model_type in results[route_id]:
+                    metrics = results[route_id][model_type]['metrics']
+                    summary_data.append({
+                        'route_id': route_id,
+                        'n_trips': n_trips,
+                        'model_type': model_type,
+                        'test_mae_min': metrics.get('test_mae_minutes', None),
+                        'test_rmse_sec': metrics.get('test_rmse_seconds', None),
+                        'test_r2': metrics.get('test_r2', None)
+                    })
+        
+        if summary_data:
+            summary_df = pd.DataFrame(summary_data)
+            summary_df = summary_df.sort_values(['n_trips', 'model_type'], ascending=[False, True])
+            
+            print("Performance by Route and Model:")
+            print(summary_df.to_string(index=False))
+            
+            # Show correlation between training data size and performance
+            if len(summary_df) > 2:
+                print(f"\n{'='*80}")
+                print("Data Size vs Performance Analysis".center(80))
+                print(f"{'='*80}\n")
+                
+                for model_type in model_types:
+                    model_data = summary_df[summary_df['model_type'] == model_type]
+                    if len(model_data) > 1:
+                        corr = model_data['n_trips'].corr(model_data['test_mae_min'])
+                        print(f"{model_type:20s}: trips vs MAE correlation = {corr:+.3f}")
+        
+        return results
     
-    advanced = {}
-    
-    # Route-specific polynomial regression
-    print("[1/4] Route-Specific Polynomial Regression")
-    print("-" * 80)
-    try:
-        result = train_polyreg_distance(
-            dataset_name=dataset_name,
-            degree=2,
-            route_specific=True,
-            save_model=True
-        )
-        advanced['polyreg_route_specific'] = result
-        print("✓ Route-specific model trained successfully")
-    except Exception as e:
-        print(f"✗ Route-specific model failed: {e}")
-    
-    # Higher degree polynomial
-    print("\n[2/4] Degree-3 Polynomial Regression")
-    print("-" * 80)
-    try:
-        result = train_polyreg_distance(
-            dataset_name=dataset_name,
-            degree=3,
-            route_specific=False,
-            save_model=True
-        )
-        advanced['polyreg_degree3'] = result
-        print("✓ Degree-3 model trained successfully")
-    except Exception as e:
-        print(f"✗ Degree-3 model failed: {e}")
-    
-    # Polynomial with weather (if available)
-    print("\n[3/4] Polynomial Regression with Weather")
-    print("-" * 80)
-    try:
-        result = train_polyreg_time(
-            dataset_name=dataset_name,
-            poly_degree=2,
-            include_temporal=True,
-            include_operational=True,
-            include_weather=True,
-            handle_nan=handle_nan,
-            save_model=True
-        )
-        advanced['polyreg_with_weather'] = result
-        print("✓ Weather-enhanced model trained successfully")
-    except Exception as e:
-        print(f"✗ Weather-enhanced model failed: {e}")
-        print("   (Weather features may not be available in dataset)")
-    
-    # EWMA with hourly grouping
-    print("\n[4/4] EWMA with Hourly Grouping")
-    print("-" * 80)
-    try:
-        result = train_ewma(
-            dataset_name=dataset_name,
-            alpha=0.3,
-            group_by=['route_id', 'stop_sequence', 'hour'],
-            save_model=True
-        )
-        advanced['ewma_hourly'] = result
-        print("✓ Hourly EWMA trained successfully")
-    except Exception as e:
-        print(f"✗ Hourly EWMA failed: {e}")
-    
-    print("\n" + "="*80)
-    print(f"Advanced Training Summary: {len(advanced)}/4 models trained")
-    print("="*80)
-    
-    return advanced
+    else:
+        # Train global models
+        print("Training GLOBAL models across all routes...\n")
+        
+        results = {}
+        
+        try:
+            if 'historical_mean' in model_types:
+                print("\n>>> Training Historical Mean (global)...")
+                results['historical_mean'] = train_historical_mean(
+                    dataset_name=dataset_name,
+                    save_model=save
+                )
+                
+            if 'polyreg_distance' in model_types:
+                print("\n>>> Training PolyReg Distance (global)...")
+                results['polyreg_distance'] = train_polyreg_distance(
+                    dataset_name=dataset_name,
+                    degree=2,
+                    save_model=save
+                )
+                
+            if 'polyreg_time' in model_types:
+                print("\n>>> Training PolyReg Time (global)...")
+                results['polyreg_time'] = train_polyreg_time(
+                    dataset_name=dataset_name,
+                    poly_degree=2,
+                    include_temporal=True,
+                    include_operational=True,
+                    save_model=save
+                )
+                
+            if 'ewma' in model_types:
+                print("\n>>> Training EWMA (global)...")
+                results['ewma'] = train_ewma(
+                    dataset_name=dataset_name,
+                    alpha=0.3,
+                    save_model=save
+                )
+        
+        except Exception as e:
+            print(f"\n❌ ERROR training global models: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Print summary
+        print(f"\n{'='*80}")
+        print("TRAINING SUMMARY".center(80))
+        print(f"{'='*80}\n")
+        
+        for model_type, result in results.items():
+            metrics = result['metrics']
+            print(f"{model_type:20s}: MAE = {metrics['test_mae_minutes']:.3f} min, "
+                  f"RMSE = {metrics['test_rmse_seconds']:.1f} sec, "
+                  f"R² = {metrics.get('test_r2', 0):.3f}")
+        
+        return results
 
 
 def main():
-    """Main training pipeline."""
     parser = argparse.ArgumentParser(
-        description="Train ETA prediction models with robust NaN handling"
+        description='Train ETA prediction models'
     )
+    
     parser.add_argument(
         '--dataset',
         type=str,
         default='sample_dataset',
-        help='Dataset name (without .parquet extension)'
+        help='Dataset name (default: sample_dataset)'
     )
+    
     parser.add_argument(
-        '--mode',
-        type=str,
-        choices=['baseline', 'advanced', 'all'],
-        default='baseline',
-        help='Training mode: baseline, advanced, or all'
+        '--by-route',
+        action='store_true',
+        help='Train separate models for each route'
     )
+    
     parser.add_argument(
-        '--handle-nan',
+        '--models',
         type=str,
-        choices=['drop', 'impute'],
-        default='drop',
-        help='How to handle NaN values: drop rows or impute'
+        nargs='+',
+        choices=['historical_mean', 'polyreg_distance', 'polyreg_time', 'ewma', 'all'],
+        default=['all'],
+        help='Models to train (default: all)'
     )
+    
     parser.add_argument(
         '--no-save',
         action='store_true',
-        help='Do not save models to registry'
-    )
-    parser.add_argument(
-        '--compare-only',
-        action='store_true',
-        help='Only compare existing models in registry'
+        help='Do not save models to registry (dry run)'
     )
     
     args = parser.parse_args()
     
-    if args.compare_only:
-        # Compare existing models
-        registry = get_registry()
-        models_df = registry.list_models()
-        
-        if models_df.empty:
-            print("No models found in registry. Train some models first.")
-            return
-        
-        print("\nModels in Registry:")
-        print(models_df)
-        
-        # Get model keys
-        model_keys = models_df['model_key'].tolist()
-        
-        # Run comparison
-        quick_compare(model_keys, args.dataset)
-        
-        return
+    # Parse model types
+    if 'all' in args.models:
+        model_types = ['historical_mean', 'polyreg_distance', 'polyreg_time', 'ewma']
+    else:
+        model_types = args.models
     
-    save_models = not args.no_save
+    # Train models
+    results = train_all_models(
+        dataset_name=args.dataset,
+        by_route=args.by_route,
+        model_types=model_types,
+        save=not args.no_save
+    )
     
-    # Train models based on mode
-    if args.mode == 'baseline':
-        models = train_all_baselines(
-            args.dataset, 
-            save_models, 
-            handle_nan=args.handle_nan
-        )
-        compare_all_models(models)
-        
-    elif args.mode == 'advanced':
-        models = train_advanced_configurations(
-            args.dataset,
-            handle_nan=args.handle_nan
-        )
-        compare_all_models(models)
-        
-    elif args.mode == 'all':
-        print("\n" + "="*80)
-        print("COMPREHENSIVE MODEL TRAINING".center(80))
-        print("="*80)
-        
-        baseline_models = train_all_baselines(
-            args.dataset, 
-            save_models,
-            handle_nan=args.handle_nan
-        )
-        advanced_models = train_advanced_configurations(
-            args.dataset,
-            handle_nan=args.handle_nan
-        )
-        
-        all_models = {**baseline_models, **advanced_models}
-        compare_all_models(all_models)
-    
-    # Print registry summary
-    print("\n" + "="*80)
-    print("MODEL REGISTRY SUMMARY".center(80))
-    print("="*80 + "\n")
-    
-    registry = get_registry()
-    models_df = registry.list_models()
-    print(f"Total models in registry: {len(models_df)}")
-    
-    if not models_df.empty:
-        print(f"\nRecent models:")
-        print(models_df.head(10))
-        print(f"\nModels saved to: {registry.base_dir}")
-    
-    print("\n✅ Training complete!")
+    print(f"\n{'='*80}")
+    print("✓ TRAINING COMPLETE".center(80))
+    print(f"{'='*80}\n")
 
 
 if __name__ == "__main__":

@@ -101,7 +101,7 @@ class Command(BaseCommand):
         distance_threshold = opts["distance_threshold"]
         max_stops_ahead = opts["max_stops_ahead"]
         # vp_sample_interval = opts["vp_sample_interval"]
-        out = opts["out"]
+        out = "../datasets/" + opts["out"]
         attach_weather = not opts["no_weather"]
         manual_routes = opts.get("route_ids")
         start_date_str = opts.get("start_date")

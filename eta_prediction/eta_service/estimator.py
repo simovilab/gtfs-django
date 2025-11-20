@@ -1,8 +1,6 @@
 """
-ETA Service - MVP Implementation
-Estimates stop arrival times from vehicle positions.
-
-Phase 1: Basic predictions with temporal + spatial features only.
+ETA Service - Enhanced Implementation
+Estimates stop arrival times from vehicle positions with route-specific model support.
 """
 
 import sys
@@ -97,6 +95,8 @@ def estimate_stop_times(
     route_id: str = None,
     trip_id: str = None,
     model_key: str = None,
+    model_type: str = None,
+    prefer_route_model: bool = True,
     max_stops: int = 3,
 ) -> dict:
     """
@@ -123,6 +123,8 @@ def estimate_stop_times(
         route_id: Route identifier (optional, for route-specific models)
         trip_id: Trip identifier (optional, for context)
         model_key: Specific model to use (if None, uses best available)
+        model_type: Filter models by type (e.g., 'polyreg_time')
+        prefer_route_model: If True, prefer route-specific models over global
         max_stops: Maximum number of stops to predict (default: 3)
         
     Returns:
@@ -133,6 +135,7 @@ def estimate_stop_times(
             'computed_at': str (ISO),
             'model_key': str,
             'model_type': str,
+            'model_scope': str ('route' or 'global'),
             'predictions': [
                 {
                     'stop_id': str,
@@ -180,13 +183,53 @@ def estimate_stop_times(
     speed_mps = vehicle_position.get('speed', 0.0)
     speed_kmh = speed_mps * 3.6
     
-    # Load model
+    # Determine route_id if not provided
+    if route_id is None:
+        route_id = vehicle_position.get('route', 'unknown')
+    
+    # Load model with smart routing logic
     registry = get_registry()
+    model_scope = 'unknown'
     
     if model_key is None:
-        # Get best model (global for MVP)
-        # TODO: Add route-specific lookup in Phase 2
-        model_key = registry.get_best_model(metric='test_mae_seconds')
+        # Smart model selection
+        if prefer_route_model and route_id and route_id != 'unknown':
+            # Try route-specific model first
+            model_key = registry.get_best_model(
+                model_type=model_type,
+                route_id=route_id,
+                metric='test_mae_seconds'
+            )
+            
+            if model_key:
+                model_scope = 'route'
+                print(f"[ETA Service] Using route-specific model for route {route_id}")
+            else:
+                # Fallback to global model
+                print(f"[ETA Service] No route-specific model for route {route_id}, using global")
+                model_key = registry.get_best_model(
+                    model_type=model_type,
+                    route_id='global',
+                    metric='test_mae_seconds'
+                )
+                model_scope = 'global'
+        else:
+            # Use global model directly
+            model_key = registry.get_best_model(
+                model_type=model_type,
+                route_id='global',
+                metric='test_mae_seconds'
+            )
+            model_scope = 'global'
+        
+        if model_key is None:
+            # Last resort: any model
+            model_key = registry.get_best_model(
+                model_type=model_type,
+                metric='test_mae_seconds'
+            )
+            model_scope = 'any'
+        
         if model_key is None:
             return {
                 'vehicle_id': vehicle_position['vehicle_id'],
@@ -197,10 +240,26 @@ def estimate_stop_times(
                 'predictions': [],
                 'error': 'No trained models found in registry'
             }
+    else:
+        # Model key explicitly provided - determine scope from metadata
+        try:
+            from models.common.keys import ModelKey
+            parsed = ModelKey.parse(model_key)
+            model_scope = parsed.get('scope', 'unknown')
+        except:
+            model_scope = 'explicit'
     
     try:
         model_metadata = registry.load_metadata(model_key)
-        model_type = model_metadata.get('model_type', 'unknown')
+        actual_model_type = model_metadata.get('model_type', 'unknown')
+        model_route_id = model_metadata.get('route_id')
+        
+        # Update scope from metadata if available
+        if model_route_id is not None:
+            model_scope = 'route'
+        elif model_scope == 'unknown':
+            model_scope = 'global'
+            
     except Exception as e:
         return {
             'vehicle_id': vehicle_position['vehicle_id'],
@@ -226,7 +285,7 @@ def estimate_stop_times(
         
         # Build feature dict with all available features
         features = {
-            'route_id': route_id or vehicle_position.get('route', 'unknown'),
+            'route_id': route_id,
             'stop_sequence': stop['stop_sequence'],
             'distance_to_stop': distance_m,
             'hour': temporal_features['hour'],
@@ -244,7 +303,7 @@ def estimate_stop_times(
         
         # Make prediction using the appropriate model interface
         try:
-            result = _predict_with_model(model_key, model_type, features, distance_m)
+            result = _predict_with_model(model_key, actual_model_type, features, distance_m)
             
             # Extract ETA from result
             eta_seconds = result.get('eta_seconds', 0.0)
@@ -279,11 +338,12 @@ def estimate_stop_times(
     
     return {
         'vehicle_id': vehicle_position['vehicle_id'],
-        'route_id': route_id or vehicle_position.get('route', 'unknown'),
+        'route_id': route_id,
         'trip_id': trip_id,
         'computed_at': datetime.now(timezone.utc).isoformat(),
         'model_key': model_key,
-        'model_type': model_type,
+        'model_type': actual_model_type,
+        'model_scope': model_scope,
         'predictions': predictions
     }
 
@@ -308,12 +368,13 @@ if __name__ == '__main__':
         {'stop_id': 'stop_003', 'stop_sequence': 7, 'lat': 9.9311, 'lon': -84.0877},
     ]
     
-    # Get predictions
+    # Get predictions with route-specific model
     result = estimate_stop_times(
         vehicle_position=vehicle_position,
         upcoming_stops=upcoming_stops,
         route_id='1',
         trip_id='trip_001',
+        prefer_route_model=True,
         max_stops=3
     )
     
@@ -321,7 +382,8 @@ if __name__ == '__main__':
     print(f"\n{'='*70}")
     print(f"ETA Predictions for Vehicle: {result['vehicle_id']}")
     print(f"Route: {result['route_id']}, Trip: {result['trip_id']}")
-    print(f"Model: {result.get('model_type', 'N/A')} ({result['model_key']})")
+    print(f"Model: {result.get('model_type', 'N/A')} ({result.get('model_scope', 'unknown')} scope)")
+    print(f"Key: {result['model_key']}")
     print(f"{'='*70}\n")
     
     if result.get('error'):
