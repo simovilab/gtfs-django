@@ -214,7 +214,7 @@ class GTFSRealtimeTests(unittest.TestCase):
                 entity.alert.header_text.translation.add(text="Sample Alert")
                 entity.alert.informed_entity.add().route_id = "R001"
 
-            with open(f"tests/data/{sample}.bin", "wb") as f:
+            with open(f"tests/data/{sample}.pb", "wb") as f:
                 f.write(feed.SerializeToString())
 
         print("Sample GTFS-RT binaries written to tests/data/")
