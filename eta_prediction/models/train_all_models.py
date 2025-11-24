@@ -14,6 +14,7 @@ from historical_mean.train import train_historical_mean
 from polyreg_distance.train import train_polyreg_distance
 from polyreg_time.train import train_polyreg_time
 from ewma.train import train_ewma
+from xgb.train import train_xgboost
 
 
 def train_all_models(dataset_name: str,
@@ -31,7 +32,13 @@ def train_all_models(dataset_name: str,
     """
     
     if model_types is None:
-        model_types = ['historical_mean', 'polyreg_distance', 'polyreg_time', 'ewma']
+        model_types = [
+            'historical_mean',
+            'polyreg_distance',
+            'polyreg_time',
+            'ewma',
+            'xgboost',   # NEW
+        ]
     
     print(f"\n{'='*80}")
     print(f"TRAINING ALL MODELS".center(80))
@@ -116,6 +123,16 @@ def train_all_models(dataset_name: str,
                         save_model=save
                     )
                     route_results['ewma'] = result
+
+                # NEW: XGBoost route-specific
+                if 'xgboost' in model_types:
+                    print(f"\n>>> Training XGBoost for route {route_id}...")
+                    result = train_xgboost(
+                        dataset_name=dataset_name,
+                        route_id=route_id,
+                        save_model=save
+                    )
+                    route_results['xgboost'] = result
                 
                 results[route_id] = route_results
                 
@@ -209,6 +226,15 @@ def train_all_models(dataset_name: str,
                     alpha=0.3,
                     save_model=save
                 )
+
+            # NEW: XGBoost global
+            if 'xgboost' in model_types:
+                print("\n>>> Training XGBoost (global)...")
+                results['xgboost'] = train_xgboost(
+                    dataset_name=dataset_name,
+                    route_id=None,  # global model
+                    save_model=save
+                )
         
         except Exception as e:
             print(f"\n❌ ERROR training global models: {e}")
@@ -251,7 +277,14 @@ def main():
         '--models',
         type=str,
         nargs='+',
-        choices=['historical_mean', 'polyreg_distance', 'polyreg_time', 'ewma', 'all'],
+        choices=[
+            'historical_mean',
+            'polyreg_distance',
+            'polyreg_time',
+            'ewma',
+            'xgboost',   # NEW
+            'all'
+        ],
         default=['all'],
         help='Models to train (default: all)'
     )
@@ -266,7 +299,13 @@ def main():
     
     # Parse model types
     if 'all' in args.models:
-        model_types = ['historical_mean', 'polyreg_distance', 'polyreg_time', 'ewma']
+        model_types = [
+            'historical_mean',
+            'polyreg_distance',
+            'polyreg_time',
+            'ewma',
+            'xgboost',   # NEW
+        ]
     else:
         model_types = args.models
     

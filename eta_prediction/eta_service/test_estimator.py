@@ -234,10 +234,93 @@ def test_all_model_types():
     return True
 
 
+def test_xgboost_models():
+    """Dedicated test to validate XGBoost ETA estimations."""
+    
+    print("\n\nTEST 4: XGBoost Models (Route-Specific & Global)")
+    print("=" * 70)
+    
+    registry = get_registry()
+    
+    # List all xgboost models
+    df = registry.list_models(model_type='xgboost')
+    if df.empty:
+        print("\nNo xgboost models found in registry. Skipping test.")
+        print("=" * 70)
+        return True
+    
+    print(f"\nFound {len(df)} xgboost models in registry:")
+    routes = registry.get_routes(model_type='xgboost')
+    print(f"  Routes with xgboost models: {routes}")
+    
+    # Separate route-specific and global models
+    route_df = df[df['route_id'] != 'global']
+    global_df = df[df['route_id'] == 'global']
+    
+    vp_data = get_sample_vp_data()
+    stops = get_sample_stops()[:2]
+    
+    # Test route-specific xgboost if available
+    if not route_df.empty:
+        print(f"\n--- Route-specific XGBoost ---")
+        test_routes = routes[:3] if len(routes) >= 3 else routes
+        for route_id in test_routes:
+            print(f"\nRoute {route_id}:")
+            result = estimate_stop_times(
+                vehicle_position=get_sample_vp_data(route_id),
+                upcoming_stops=stops,
+                route_id=route_id,
+                trip_id=f"trip_xgb_{route_id}",
+                model_type='xgboost',
+                prefer_route_model=True,
+                max_stops=2,
+            )
+            if result.get('error'):
+                print(f"  ✗ Error: {result['error']}")
+            else:
+                print(f"  ✓ Scope: {result.get('model_scope', 'unknown')}")
+                print(f"    Model: {result.get('model_key', '')[:60]}...")
+                if result['predictions'] and not result['predictions'][0].get('error'):
+                    first = result['predictions'][0]
+                    print(f"    First stop ETA: {first['eta_formatted']} ({first['eta_seconds']:.0f}s)")
+                else:
+                    print("    ✗ Prediction failed for first stop.")
+    else:
+        print("\nNo route-specific xgboost models found.")
+    
+    # Test global xgboost if available
+    if not global_df.empty:
+        print(f"\n--- Global XGBoost ---")
+        result = estimate_stop_times(
+            vehicle_position=vp_data,
+            upcoming_stops=stops,
+            route_id='1',
+            trip_id='trip_xgb_global',
+            model_type='xgboost',
+            prefer_route_model=False,  # force global
+            max_stops=2,
+        )
+        if result.get('error'):
+            print(f"  ✗ Error: {result['error']}")
+        else:
+            print(f"  ✓ Scope: {result.get('model_scope', 'unknown')}")
+            print(f"    Model: {result.get('model_key', '')[:60]}...")
+            if result['predictions'] and not result['predictions'][0].get('error'):
+                first = result['predictions'][0]
+                print(f"    First stop ETA: {first['eta_formatted']} ({first['eta_seconds']:.0f}s)")
+            else:
+                print("    ✗ Prediction failed for first stop.")
+    else:
+        print("\nNo global xgboost models found.")
+    
+    print("\n" + "=" * 70)
+    return True
+
+
 def test_route_performance_comparison():
     """Compare predictions across different routes with varying training data."""
     
-    print("\n\nTEST 4: Route Performance Comparison")
+    print("\n\nTEST 5: Route Performance Comparison")
     print("=" * 70)
     
     registry = get_registry()
@@ -317,7 +400,7 @@ def test_route_performance_comparison():
 def test_different_distances():
     """Test predictions at various distances."""
     
-    print("\n\nTEST 5: Predictions at Different Distances")
+    print("\n\nTEST 6: Predictions at Different Distances")
     print("=" * 70)
     
     vp_data = get_sample_vp_data()
@@ -329,7 +412,7 @@ def test_different_distances():
     
     registry = get_registry()
     # Try to find a polyreg_distance model for this test
-    df = registry.list_models(route_id='Green-B', model_type='polyreg_distance')
+    df = registry.list_models(route_id='Green-E', model_type='xgboost')
     # df = registry.list_models(model_type='polyreg_distance')
     
     if df.empty:
@@ -339,6 +422,7 @@ def test_different_distances():
         model_key = df.iloc[0]['model_key']
         print(f"  Using model: {model_key[:60]}...")
     
+    model_key = None
     for dist_m in test_distances:
         # Calculate approximate lat/lon offset
         lat_offset = dist_m / 111320.0  # Rough: 1 degree lat ≈ 111.32 km
@@ -374,11 +458,11 @@ def test_different_distances():
 def test_edge_cases():
     """Test error handling."""
     
-    print("\n\nTEST 6: Edge Cases & Error Handling")
+    print("\n\nTEST 7: Edge Cases & Error Handling")
     print("=" * 70)
     
     # Test 1: No stops
-    print("\n6a. Empty stops list:")
+    print("\n7a. Empty stops list:")
     result = estimate_stop_times(
         vehicle_position=get_sample_vp_data(),
         upcoming_stops=[],
@@ -388,7 +472,7 @@ def test_edge_cases():
     print(f"    ✓ Handled gracefully" if result.get('error') else "    ✗ Should have errored")
     
     # Test 2: Invalid model key
-    print("\n6b. Invalid model key:")
+    print("\n7b. Invalid model key:")
     result = estimate_stop_times(
         vehicle_position=get_sample_vp_data(),
         upcoming_stops=get_sample_stops()[:1],
@@ -399,7 +483,7 @@ def test_edge_cases():
     print(f"    ✓ Handled gracefully" if result.get('error') else "    ✗ Should have errored")
     
     # Test 3: Missing optional fields
-    print("\n6c. Minimal vehicle position:")
+    print("\n7c. Minimal vehicle position:")
     minimal_vp = {
         'vehicle_id': 'minimal_bus',
         'lat': 9.9281,
@@ -418,7 +502,7 @@ def test_edge_cases():
         print(f"    ✓ Handled missing fields, got ETA: {result['predictions'][0].get('eta_formatted', 'N/A')}")
     
     # Test 4: Route with no trained model
-    print("\n6d. Route without trained model:")
+    print("\n7d. Route without trained model:")
     result = estimate_stop_times(
         vehicle_position=get_sample_vp_data('999'),
         upcoming_stops=get_sample_stops()[:1],
@@ -446,6 +530,7 @@ if __name__ == '__main__':
         ("Basic Prediction", test_basic_prediction),
         ("Route-Specific Models", test_route_specific_models),
         ("All Model Types", test_all_model_types),
+        ("XGBoost Models", test_xgboost_models),  # NEW
         ("Route Performance Comparison", test_route_performance_comparison),
         ("Different Distances", test_different_distances),
         ("Edge Cases", test_edge_cases),
