@@ -31,6 +31,46 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
+def _progress_features(vehicle_position, stop, next_stop, total_segments_hint):
+    """Approximate distance/progress metrics without requiring shapes."""
+    vp_lat = vehicle_position["lat"]
+    vp_lon = vehicle_position["lon"]
+    stop_lat = stop["lat"]
+    stop_lon = stop["lon"]
+
+    distance_to_stop = haversine_distance(vp_lat, vp_lon, stop_lat, stop_lon)
+
+    progress_on_segment = 0.0
+    if next_stop:
+        next_lat = next_stop["lat"]
+        next_lon = next_stop["lon"]
+        segment_length = haversine_distance(stop_lat, stop_lon, next_lat, next_lon)
+        if segment_length == 0.0:
+            distance_to_next = 0.0
+        else:
+            distance_to_next = haversine_distance(vp_lat, vp_lon, next_lat, next_lon)
+            progress_on_segment = max(0.0, min(1.0, 1.0 - (distance_to_next / segment_length)))
+    else:
+        distance_to_next = None
+
+    stop_seq = (
+        stop.get("stop_sequence")
+        or stop.get("sequence")
+        or stop.get("stop_order")
+        or 1
+    )
+    total_segments = (
+        stop.get("total_stop_sequence")
+        or total_segments_hint
+        or stop_seq
+    )
+    completed = max(float(stop_seq) - 1.0, 0.0)
+    denom = max(float(total_segments), 1.0)
+    progress_ratio = max(0.0, min(1.0, (completed + progress_on_segment) / denom))
+
+    return distance_to_stop, progress_on_segment, progress_ratio
+
+
 def _predict_with_model(model_key, model_type, features, distance_m):
     """
     Call the appropriate predict_eta function based on model type.
@@ -68,15 +108,16 @@ def _predict_with_model(model_key, model_type, features, distance_m):
         return predict_eta(
             model_key=model_key,
             distance_to_stop=distance_m,
+            progress_on_segment=features.get('progress_on_segment'),
+            progress_ratio=features.get('progress_ratio'),
             hour=features.get('hour', 0),
             day_of_week=features.get('day_of_week', 0),
             is_peak_hour=features.get('is_peak_hour', False),
             is_weekend=features.get('is_weekend', False),
             is_holiday=features.get('is_holiday', False),
-            headway_seconds=features.get('headway_seconds', 120.0),
-            current_speed_kmh=features.get('speed_kmh', 0.0),
             temperature_c=features.get('temperature_c', 25.0),
-            precipitation_mm=features.get('precipitation_mm', 0.0)
+            precipitation_mm=features.get('precipitation_mm', 0.0),
+            wind_speed_kmh=features.get('wind_speed_kmh')
         )
 
     # ✅ NEW XGBOOST BRANCH (consistent with xgb/predict.py)
@@ -86,13 +127,13 @@ def _predict_with_model(model_key, model_type, features, distance_m):
         return predict_eta(
             model_key=model_key,
             distance_to_stop=distance_m,
+            progress_on_segment=features.get('progress_on_segment'),
+            progress_ratio=features.get('progress_ratio'),
             hour=features.get('hour', 0),
             day_of_week=features.get('day_of_week', 0),
             is_peak_hour=features.get('is_peak_hour', False),
             is_weekend=features.get('is_weekend', False),
             is_holiday=features.get('is_holiday', False),
-            headway_seconds=features.get('headway_seconds', 120.0),
-            current_speed_kmh=features.get('speed_kmh', 0.0),
             temperature_c=features.get('temperature_c', 25.0),
             precipitation_mm=features.get('precipitation_mm', 0.0),
             wind_speed_kmh=features.get('wind_speed_kmh', None)
@@ -139,10 +180,6 @@ def estimate_stop_times(
         tz='America/Costa_Rica',
         region='CR'
     )
-
-    # Convert speed
-    speed_mps = vehicle_position.get('speed', 0.0)
-    speed_kmh = speed_mps * 3.6
 
     # Determine route
     if route_id is None:
@@ -223,32 +260,50 @@ def estimate_stop_times(
     #    PREDICT STOP ETAs
     # ============================================================
     predictions = []
+    approx_total_segments = max(
+        (
+            stop.get('total_stop_sequence')
+            or stop.get('stop_sequence')
+            or stop.get('sequence')
+            or 0
+        )
+        for stop in stops_to_predict
+    ) if stops_to_predict else 0
+    if approx_total_segments <= 0:
+        approx_total_segments = max(len(stops_to_predict), 1)
 
-    for stop in stops_to_predict:
+    for idx, stop in enumerate(stops_to_predict):
+        next_stop = stops_to_predict[idx + 1] if idx + 1 < len(stops_to_predict) else None
 
-        distance_m = haversine_distance(
-            vehicle_position['lat'],
-            vehicle_position['lon'],
-            stop['lat'],
-            stop['lon']
+        distance_m, progress_on_segment, progress_ratio = _progress_features(
+            vehicle_position,
+            stop,
+            next_stop,
+            approx_total_segments,
+        )
+
+        stop_sequence_value = (
+            stop.get('stop_sequence')
+            or stop.get('sequence')
+            or stop.get('stop_order')
+            or idx + 1
         )
 
         # Build features
         features = {
             'route_id': route_id,
-            'stop_sequence': stop['stop_sequence'],
+            'stop_sequence': stop_sequence_value,
             'distance_to_stop': distance_m,
+            'progress_on_segment': progress_on_segment,
+            'progress_ratio': progress_ratio,
             'hour': temporal_features['hour'],
             'day_of_week': temporal_features['day_of_week'],
             'is_weekend': temporal_features['is_weekend'],
             'is_holiday': temporal_features['is_holiday'],
             'is_peak_hour': temporal_features['is_peak_hour'],
-            'speed_kmh': speed_kmh,
-            'speed_mps': speed_mps,
-            'headway_seconds': 120.0,
             'temperature_c': 25.0,
             'precipitation_mm': 0.0,
-            'wind_speed_kmh': None,     # Optional
+            'wind_speed_kmh': None,
         }
 
         try:
@@ -265,7 +320,7 @@ def estimate_stop_times(
 
             predictions.append({
                 'stop_id': stop['stop_id'],
-                'stop_sequence': stop['stop_sequence'],
+                'stop_sequence': stop_sequence_value,
                 'distance_to_stop_m': round(distance_m, 1),
                 'eta_seconds': round(eta_seconds, 1),
                 'eta_minutes': round(eta_minutes, 2),
@@ -276,7 +331,7 @@ def estimate_stop_times(
         except Exception as e:
             predictions.append({
                 'stop_id': stop['stop_id'],
-                'stop_sequence': stop['stop_sequence'],
+                'stop_sequence': stop_sequence_value,
                 'distance_to_stop_m': round(distance_m, 1),
                 'eta_seconds': None,
                 'eta_minutes': None,

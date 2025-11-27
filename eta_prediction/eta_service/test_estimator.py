@@ -32,10 +32,10 @@ def get_sample_vp_data(route='1'):
 def get_sample_stops():
     """Mock upcoming stops."""
     return [
-        {'stop_id': 'stop_001', 'stop_sequence': 5, 'lat': 9.9281, 'lon': -84.0907},  # Current stop
-        {'stop_id': 'stop_002', 'stop_sequence': 6, 'lat': 9.9306, 'lon': -84.0882},  # Next stop (~281m away)
-        {'stop_id': 'stop_003', 'stop_sequence': 7, 'lat': 9.9331, 'lon': -84.0857},  # Stop after
-        {'stop_id': 'stop_004', 'stop_sequence': 8, 'lat': 9.9356, 'lon': -84.0832},  # Stop after that
+        {'stop_id': 'stop_001', 'stop_sequence': 5, 'total_stop_sequence': 20, 'lat': 9.9281, 'lon': -84.0907},
+        {'stop_id': 'stop_002', 'stop_sequence': 6, 'total_stop_sequence': 20, 'lat': 9.9306, 'lon': -84.0882},
+        {'stop_id': 'stop_003', 'stop_sequence': 7, 'total_stop_sequence': 20, 'lat': 9.9331, 'lon': -84.0857},
+        {'stop_id': 'stop_004', 'stop_sequence': 8, 'total_stop_sequence': 20, 'lat': 9.9356, 'lon': -84.0832},
     ]
 
 

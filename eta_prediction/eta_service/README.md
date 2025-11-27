@@ -17,9 +17,9 @@ The `eta_service` provides a production-ready interface for generating ETA predi
 
 **Not Yet Implemented:**
 - ⏳ Redis caching (upcoming stops, predictions)
-- ⏳ Route-specific model selection
-- ⏳ Operational features (headway, congestion)
-- ⏳ Weather features
+- ⏳ Persistent route-specific model overrides
+- ⏳ Shape-aware progress (currently geometric fallback only)
+- ⏳ Weather integrations (currently constants)
 - ⏳ Confidence intervals
 - ⏳ Database integration for stop sequences
 
@@ -44,9 +44,9 @@ vehicle_position = {
 
 # Upcoming stops (from cached route data)
 upcoming_stops = [
-    {'stop_id': 'stop_001', 'stop_sequence': 5, 'lat': 9.9291, 'lon': -84.0897},
-    {'stop_id': 'stop_002', 'stop_sequence': 6, 'lat': 9.9301, 'lon': -84.0887},
-    {'stop_id': 'stop_003', 'stop_sequence': 7, 'lat': 9.9311, 'lon': -84.0877},
+    {'stop_id': 'stop_001', 'stop_sequence': 5, 'total_stop_sequence': 20, 'lat': 9.9291, 'lon': -84.0897},
+    {'stop_id': 'stop_002', 'stop_sequence': 6, 'total_stop_sequence': 20, 'lat': 9.9301, 'lon': -84.0887},
+    {'stop_id': 'stop_003', 'stop_sequence': 7, 'total_stop_sequence': 20, 'lat': 9.9311, 'lon': -84.0877},
 ]
 
 # Get predictions
@@ -203,8 +203,8 @@ eta_service/
    - Model performance monitoring
 
 3. **Additional Features**
-   - Operational features (headway from recent VPs)
-   - Optional weather integration
+   - Shape-derived progress metrics
+   - Weather integration
    - Confidence intervals
 
 4. **Performance Optimization**
