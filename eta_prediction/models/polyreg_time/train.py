@@ -1,12 +1,12 @@
 """
 Polynomial Regression Model - Time Enhanced
-Fits polynomial features with temporal, operational, and optional weather features.
+Fits polynomial features with temporal, spatial, and optional weather features.
 """
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional
-from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+from typing import Dict, List, Optional, Tuple
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler, OneHotEncoder
 from sklearn.linear_model import Ridge
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
@@ -22,14 +22,22 @@ from common.registry import get_registry
 from common.utils import print_metrics_table, train_test_summary, clip_predictions
 
 
+def _make_one_hot_encoder() -> OneHotEncoder:
+    """Instantiate OneHotEncoder compatible with sklearn>=1.2 (sparse_output) and older."""
+    try:
+        return OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown='ignore', sparse=False)
+
+
 class PolyRegTimeModel:
     """
-    Enhanced polynomial regression with temporal/operational features.
+    Enhanced polynomial regression with temporal/spatial features.
     
     Features: 
     - Core: distance_to_stop (polynomialized)
     - Temporal: hour, day_of_week, is_weekend, is_peak_hour
-    - Operational: headway_seconds, current_speed_kmh
+    - Spatial: progress_on_segment, progress_ratio
     - Weather: temperature_c, precipitation_mm, wind_speed_kmh
     """
     
@@ -37,7 +45,7 @@ class PolyRegTimeModel:
                  poly_degree: int = 2,
                  alpha: float = 1.0,
                  include_temporal: bool = True,
-                 include_operational: bool = True,
+                 include_spatial: bool = True,
                  include_weather: bool = False,
                  handle_nan: str = 'drop'):  # 'drop', 'impute', or 'error'
         """
@@ -47,28 +55,30 @@ class PolyRegTimeModel:
             poly_degree: Polynomial degree for distance
             alpha: Ridge regularization strength
             include_temporal: Include time-of-day features
-            include_operational: Include headway/speed features
+            include_spatial: Include spatial progress/segment features
             include_weather: Include weather features
             handle_nan: How to handle NaN - 'drop', 'impute', or 'error'
         """
         self.poly_degree = poly_degree
         self.alpha = alpha
         self.include_temporal = include_temporal
-        self.include_operational = include_operational
+        self.include_spatial = include_spatial
         self.include_weather = include_weather
         self.handle_nan = handle_nan
         self.model = None
         self.feature_cols = None
         self.available_features = None
+        self.categorical_features: List[str] = []
+        self.numeric_features: List[str] = []
         
     def _get_feature_groups(self) -> Dict[str, List[str]]:
         """Define feature groups."""
         return {
             'core': ['distance_to_stop'],
+            'spatial_numeric': ['progress_on_segment', 'progress_ratio']
+                              if self.include_spatial else [],
             'temporal': ['hour', 'day_of_week', 'is_weekend', 'is_peak_hour'] 
                        if self.include_temporal else [],
-            'operational': ['headway_seconds', 'current_speed_kmh'] 
-                          if self.include_operational else [],
             'weather': ['temperature_c', 'precipitation_mm', 'wind_speed_kmh'] 
                       if self.include_weather else []
         }
@@ -199,15 +209,48 @@ class PolyRegTimeModel:
     
     def _create_pipeline(self) -> Pipeline:
         """Create sklearn pipeline."""
-        # Separate polynomial features for distance and scaling for others
+        if not self.feature_cols:
+            raise ValueError("Feature columns must be set before building pipeline")
+
+        transformers = []
+
+        if 'distance_to_stop' in self.feature_cols:
+            transformers.append((
+                'poly_distance',
+                Pipeline([
+                    ('poly', PolynomialFeatures(
+                        degree=self.poly_degree,
+                        include_bias=False
+                    )),
+                    ('scale', StandardScaler())
+                ]),
+                ['distance_to_stop']
+            ))
+
+        numeric_others = [
+            col for col in self.numeric_features
+            if col != 'distance_to_stop'
+        ]
+        if numeric_others:
+            transformers.append((
+                'scale_numeric',
+                StandardScaler(),
+                numeric_others
+            ))
+
+        if self.categorical_features:
+            transformers.append((
+                'encode_categorical',
+                _make_one_hot_encoder(),
+                self.categorical_features
+            ))
+
         return Pipeline([
-            ('features', ColumnTransformer([
-                ('poly_distance', PolynomialFeatures(
-                    degree=self.poly_degree, 
-                    include_bias=False
-                ), [0]),  # First column is distance
-                ('scale_others', StandardScaler(), slice(1, None))  # Rest of features
-            ])),
+            ('features', ColumnTransformer(
+                transformers,
+                remainder='drop',
+                sparse_threshold=0.0
+            )),
             ('ridge', Ridge(alpha=self.alpha))
         ])
     
@@ -227,19 +270,22 @@ class PolyRegTimeModel:
         feature_groups = self._get_feature_groups()
         self.feature_cols = []
         
-        # Always include core (distance)
-        for feat in feature_groups['core']:
-            if feat in self.available_features:
-                self.feature_cols.append(feat)
-        
-        # Add other available features
-        for group in ['temporal', 'operational', 'weather']:
-            for feat in feature_groups[group]:
-                if feat in self.available_features:
+        group_order = [
+            'core',
+            'spatial_numeric',
+            'temporal',
+            'weather',
+        ]
+        for group in group_order:
+            for feat in feature_groups.get(group, []):
+                if feat in self.available_features and feat not in self.feature_cols:
                     self.feature_cols.append(feat)
         
         if not self.feature_cols:
             raise ValueError("No features available after cleaning!")
+
+        self.categorical_features = []
+        self.numeric_features = list(self.feature_cols)
         
         print(f"\n{'='*60}")
         print("Model Training")
@@ -247,7 +293,7 @@ class PolyRegTimeModel:
         print(f"Features ({len(self.feature_cols)}): {', '.join(self.feature_cols)}")
         
         # Prepare data
-        X = train_clean[self.feature_cols].values
+        X = train_clean[self.feature_cols]
         y = train_clean[target_col].values
         
         # Create and fit model
@@ -281,22 +327,23 @@ class PolyRegTimeModel:
         X_pred = X[self.feature_cols].copy()
         
         if self.handle_nan == 'impute':
-            # Impute with median/mode
-            for col in self.feature_cols:
+            for col in self.numeric_features:
                 if X_pred[col].isna().any():
-                    if pd.api.types.is_numeric_dtype(X_pred[col]):
-                        X_pred[col] = X_pred[col].fillna(X_pred[col].median())
-                    else:
-                        X_pred[col] = X_pred[col].fillna(X_pred[col].mode()[0])
+                    X_pred[col] = X_pred[col].fillna(X_pred[col].median())
+            for col in self.categorical_features:
+                if X_pred[col].isna().any():
+                    mode_series = X_pred[col].mode()
+                    filler = mode_series.iloc[0] if not mode_series.empty else "missing"
+                    X_pred[col] = X_pred[col].fillna(filler)
         elif self.handle_nan == 'drop':
-            # For prediction, we can't drop - impute instead
-            for col in self.feature_cols:
+            for col in self.numeric_features:
                 if X_pred[col].isna().any():
-                    if pd.api.types.is_numeric_dtype(X_pred[col]):
-                        X_pred[col] = X_pred[col].fillna(0)  # Safe default
+                    X_pred[col] = X_pred[col].fillna(0.0)
+            for col in self.categorical_features:
+                if X_pred[col].isna().any():
+                    X_pred[col] = X_pred[col].fillna("missing")
         
-        X_array = X_pred.values
-        predictions = self.model.predict(X_array)
+        predictions = self.model.predict(X_pred[self.feature_cols])
         
         return clip_predictions(predictions)
     
@@ -306,12 +353,14 @@ class PolyRegTimeModel:
             return {}
         
         coefs = self.model.named_steps['ridge'].coef_
+        transformer = self.model.named_steps['features']
+        feature_names = transformer.get_feature_names_out()
         
-        importance = {}
-        for i, feat in enumerate(self.feature_cols):
-            importance[feat] = abs(coefs[i])
+        importance = {
+            name: abs(coef)
+            for name, coef in zip(feature_names, coefs)
+        }
         
-        # Sort by importance
         return dict(sorted(importance.items(), key=lambda x: x[1], reverse=True))
 
 
@@ -320,11 +369,12 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
                       poly_degree: int = 2,
                       alpha: float = 1.0,
                       include_temporal: bool = True,
-                      include_operational: bool = True,
+                      include_spatial: bool = True,
                       include_weather: bool = False,
                       handle_nan: str = 'drop',
                       test_size: float = 0.2,
-                      save_model: bool = True) -> Dict:
+                      save_model: bool = True,
+                      pre_split: Optional[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = None) -> Dict:
     """
     Train and evaluate polynomial regression time model.
     
@@ -334,11 +384,11 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         poly_degree: Polynomial degree for distance
         alpha: Ridge regularization
         include_temporal: Include temporal features
-        include_operational: Include operational features
         include_weather: Include weather features
         handle_nan: 'drop', 'impute', or 'error'
         test_size: Test set fraction
         save_model: Save to registry
+        pre_split: Optional (train, val, test) DataFrames to reuse
         
     Returns:
         Dictionary with model, metrics, metadata
@@ -351,7 +401,7 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     print(f"Scope{route_info}")
     print(f"Config:")
     print(f"  poly_degree={poly_degree}, alpha={alpha}")
-    print(f"  temporal={include_temporal}, operational={include_operational}")
+    print(f"  temporal={include_temporal}, spatial={include_spatial}")
     print(f"  weather={include_weather}, handle_nan='{handle_nan}'")
     
     # Load dataset
@@ -370,11 +420,13 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         
         dataset.df = df_filtered
     
-    # Split data
-    train_df, val_df, test_df = dataset.temporal_split(
-        train_frac=1-test_size-0.1,
-        val_frac=0.1
-    )
+    if pre_split is not None:
+        train_df, val_df, test_df = (df.copy() for df in pre_split)
+    else:
+        train_df, val_df, test_df = dataset.temporal_split(
+            train_frac=1-test_size-0.1,
+            val_frac=0.1
+        )
     
     train_test_summary(train_df, test_df, val_df)
     
@@ -386,7 +438,7 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         poly_degree=poly_degree,
         alpha=alpha,
         include_temporal=include_temporal,
-        include_operational=include_operational,
+        include_spatial=include_spatial,
         include_weather=include_weather,
         handle_nan=handle_nan
     )
@@ -425,7 +477,7 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         'poly_degree': poly_degree,
         'alpha': alpha,
         'include_temporal': include_temporal,
-        'include_operational': include_operational,
+        'include_spatial': include_spatial,
         'include_weather': include_weather,
         'handle_nan': handle_nan,
         'n_features': len(model.feature_cols) if model.feature_cols else 0,
@@ -439,7 +491,13 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     
     # Save
     if save_model:
-        feature_groups = ['temporal', 'operational'] if include_temporal else ['operational']
+        feature_groups = []
+        if include_temporal:
+            feature_groups.append('temporal')
+        if include_spatial:
+            feature_groups.append('spatial')
+        if include_weather:
+            feature_groups.append('weather')
         model_key = ModelKey.generate(
             model_type='polyreg_time',
             dataset_name=dataset_name,
@@ -468,7 +526,6 @@ if __name__ == "__main__":
     result1 = train_polyreg_time(
         poly_degree=2,
         include_temporal=True,
-        include_operational=True,
         include_weather=False,
         handle_nan='drop'
     )
@@ -477,7 +534,6 @@ if __name__ == "__main__":
     result2 = train_polyreg_time(
         poly_degree=2,
         include_temporal=True,
-        include_operational=True,
         include_weather=False,
         handle_nan='impute'
     )

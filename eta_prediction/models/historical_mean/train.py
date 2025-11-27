@@ -5,7 +5,7 @@ Predicts ETA based on historical average travel times grouped by route, stop, an
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import sys
 from pathlib import Path
 
@@ -113,7 +113,8 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
                          route_id: Optional[str] = None,
                          group_by: List[str] = ['route_id', 'stop_sequence', 'hour'],
                          test_size: float = 0.2,
-                         save_model: bool = True) -> Dict:
+                         save_model: bool = True,
+                         pre_split: Optional[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = None) -> Dict:
     """
     Train and evaluate historical mean model.
     
@@ -123,6 +124,7 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
         group_by: List of columns to group by
         test_size: Fraction of data for testing
         save_model: Whether to save to registry
+        pre_split: Optional (train, val, test) DataFrames to reuse
         
     Returns:
         Dictionary with model, metrics, and metadata
@@ -151,11 +153,13 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
         
         dataset.df = df_filtered
     
-    # Split data temporally
-    train_df, val_df, test_df = dataset.temporal_split(
-        train_frac=1-test_size-0.1,
-        val_frac=0.1
-    )
+    if pre_split is not None:
+        train_df, val_df, test_df = (df.copy() for df in pre_split)
+    else:
+        train_df, val_df, test_df = dataset.temporal_split(
+            train_frac=1-test_size-0.1,
+            val_frac=0.1
+        )
     
     train_test_summary(train_df, test_df, val_df)
     

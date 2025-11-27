@@ -1,15 +1,17 @@
 """
-XGBoost Regression Model - Time & Operational Features
-Fits a gradient boosted tree model with temporal, operational,
+XGBoost Regression Model - Time & Spatial Features
+Fits a gradient boosted tree model with temporal, spatial,
 and optional weather features for ETA prediction.
 """
 
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
 from xgboost import XGBRegressor
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -21,14 +23,22 @@ from common.registry import get_registry
 from common.utils import print_metrics_table, train_test_summary, clip_predictions
 
 
+def _make_one_hot_encoder() -> OneHotEncoder:
+    """Return a OneHotEncoder that works across sklearn versions."""
+    try:
+        return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown="ignore", sparse=False)
+
+
 class XGBTimeModel:
     """
-    Gradient boosted tree model (XGBoost) with temporal/operational features.
+    Gradient boosted tree model (XGBoost) with temporal/spatial features.
     
     Features: 
     - Core: distance_to_stop
     - Temporal: hour, day_of_week, is_weekend, is_peak_hour
-    - Operational: headway_seconds, current_speed_kmh
+    - Spatial: progress_on_segment, progress_ratio
     - Weather: temperature_c, precipitation_mm, wind_speed_kmh
     """
 
@@ -40,7 +50,7 @@ class XGBTimeModel:
         subsample: float = 0.8,
         colsample_bytree: float = 0.8,
         include_temporal: bool = True,
-        include_operational: bool = True,
+        include_spatial: bool = True,
         include_weather: bool = False,
         handle_nan: str = "drop",  # 'drop', 'impute', or 'error'
         random_state: int = 42,
@@ -56,7 +66,7 @@ class XGBTimeModel:
             subsample: Row subsample ratio per tree
             colsample_bytree: Column subsample ratio per tree
             include_temporal: Include time-of-day features
-            include_operational: Include headway/speed features
+            include_spatial: Include spatial progress/segment features
             include_weather: Include weather features
             handle_nan: How to handle NaN - 'drop', 'impute', or 'error'
             random_state: Random seed
@@ -68,7 +78,7 @@ class XGBTimeModel:
         self.subsample = subsample
         self.colsample_bytree = colsample_bytree
         self.include_temporal = include_temporal
-        self.include_operational = include_operational
+        self.include_spatial = include_spatial
         self.include_weather = include_weather
         self.handle_nan = handle_nan
         self.random_state = random_state
@@ -77,19 +87,22 @@ class XGBTimeModel:
         self.model: Optional[XGBRegressor] = None
         self.feature_cols: Optional[List[str]] = None
         self.available_features: Optional[List[str]] = None
+        self.preprocessor: Optional[ColumnTransformer] = None
+        self.categorical_features: List[str] = []
+        self.numeric_features: List[str] = []
 
     def _get_feature_groups(self) -> Dict[str, List[str]]:
         """Define feature groups."""
         return {
             "core": ["distance_to_stop"],
+            "spatial_numeric": (
+                ["progress_on_segment", "progress_ratio"]
+                if self.include_spatial
+                else []
+            ),
             "temporal": (
                 ["hour", "day_of_week", "is_weekend", "is_peak_hour"]
                 if self.include_temporal
-                else []
-            ),
-            "operational": (
-                ["headway_seconds", "current_speed_kmh"]
-                if self.include_operational
                 else []
             ),
             "weather": (
@@ -98,6 +111,37 @@ class XGBTimeModel:
                 else []
             ),
         }
+
+    def _build_preprocessor(self) -> None:
+        """Create a ColumnTransformer to handle numeric + categorical features."""
+        if not self.feature_cols:
+            raise ValueError("Feature columns must be set before building the preprocessor")
+
+        transformers = []
+        numeric_features = [
+            col for col in self.feature_cols if col not in self.categorical_features
+        ]
+        self.numeric_features = numeric_features
+
+        if numeric_features:
+            transformers.append((
+                "numeric",
+                "passthrough",
+                numeric_features,
+            ))
+
+        if self.categorical_features:
+            transformers.append((
+                "categorical",
+                _make_one_hot_encoder(),
+                self.categorical_features,
+            ))
+
+        self.preprocessor = ColumnTransformer(
+            transformers,
+            remainder="drop",
+            sparse_threshold=0.0,
+        )
 
     def _clean_data(
         self,
@@ -247,19 +291,23 @@ class XGBTimeModel:
         feature_groups = self._get_feature_groups()
         self.feature_cols = []
 
-        # Always include core (distance)
-        for feat in feature_groups["core"]:
-            if feat in self.available_features:
-                self.feature_cols.append(feat)
-
-        # Add other available features
-        for group in ["temporal", "operational", "weather"]:
-            for feat in feature_groups[group]:
-                if feat in self.available_features:
+        group_order = [
+            "core",
+            "spatial_numeric",
+            "spatial_categorical",
+            "temporal",
+            "weather",
+        ]
+        for group in group_order:
+            for feat in feature_groups.get(group, []):
+                if feat in self.available_features and feat not in self.feature_cols:
                     self.feature_cols.append(feat)
 
         if not self.feature_cols:
             raise ValueError("No features available after cleaning!")
+
+        self.categorical_features = []
+        self._build_preprocessor()
 
         print(f"\n{'=' * 60}")
         print("Model Training (XGBoost)".center(60))
@@ -267,8 +315,10 @@ class XGBTimeModel:
         print(f"Features ({len(self.feature_cols)}): {', '.join(self.feature_cols)}")
 
         # Prepare data
-        X = train_clean[self.feature_cols].values
+        X = train_clean[self.feature_cols]
         y = train_clean[target_col].values
+
+        X_transformed = self.preprocessor.fit_transform(X)
 
         # Create and fit model
         self.model = XGBRegressor(
@@ -281,7 +331,7 @@ class XGBTimeModel:
             random_state=self.random_state,
             n_jobs=self.n_jobs,
         )
-        self.model.fit(X, y)
+        self.model.fit(X_transformed, y)
 
         print(
             f"✓ XGBoost model trained "
@@ -302,8 +352,8 @@ class XGBTimeModel:
         if self.model is None:
             raise ValueError("Model not trained")
 
-        if self.feature_cols is None:
-            raise ValueError("Feature columns not set")
+        if self.feature_cols is None or self.preprocessor is None:
+            raise ValueError("Feature/preprocessor not set")
 
         # Check for missing features
         missing = [f for f in self.feature_cols if f not in X.columns]
@@ -314,41 +364,42 @@ class XGBTimeModel:
         X_pred = X[self.feature_cols].copy()
 
         if self.handle_nan == "impute":
-            # Impute with median/mode
-            for col in self.feature_cols:
+            for col in self.numeric_features:
                 if X_pred[col].isna().any():
-                    if pd.api.types.is_numeric_dtype(X_pred[col]):
-                        X_pred[col] = X_pred[col].fillna(X_pred[col].median())
-                    else:
-                        X_pred[col] = X_pred[col].fillna(X_pred[col].mode()[0])
+                    X_pred[col] = X_pred[col].fillna(X_pred[col].median())
+            for col in self.categorical_features:
+                if X_pred[col].isna().any():
+                    mode_series = X_pred[col].mode()
+                    filler = mode_series.iloc[0] if not mode_series.empty else "missing"
+                    X_pred[col] = X_pred[col].fillna(filler)
         elif self.handle_nan == "drop":
-            # For prediction, we can't drop - impute instead with safe defaults
-            for col in self.feature_cols:
+            for col in self.numeric_features:
                 if X_pred[col].isna().any():
-                    if pd.api.types.is_numeric_dtype(X_pred[col]):
-                        X_pred[col] = X_pred[col].fillna(0.0)
-                    else:
-                        X_pred[col] = X_pred[col].fillna(0)
+                    X_pred[col] = X_pred[col].fillna(0.0)
+            for col in self.categorical_features:
+                if X_pred[col].isna().any():
+                    X_pred[col] = X_pred[col].fillna("missing")
 
-        X_array = X_pred.values
-        predictions = self.model.predict(X_array)
+        X_transformed = self.preprocessor.transform(X_pred[self.feature_cols])
+        predictions = self.model.predict(X_transformed)
 
         return clip_predictions(predictions)
 
     def get_feature_importance(self) -> Dict[str, float]:
         """Get feature importances as reported by XGBoost."""
-        if self.model is None or self.feature_cols is None:
+        if self.model is None or self.preprocessor is None:
             return {}
 
         if not hasattr(self.model, "feature_importances_"):
             return {}
 
         importances = self.model.feature_importances_
+        feature_names = self.preprocessor.get_feature_names_out()
 
         # Map back to feature names
         importance = {
             feat: float(imp)
-            for feat, imp in zip(self.feature_cols, importances)
+            for feat, imp in zip(feature_names, importances)
         }
 
         # Sort by importance
@@ -364,11 +415,12 @@ def train_xgboost(
     subsample: float = 0.8,
     colsample_bytree: float = 0.8,
     include_temporal: bool = True,
-    include_operational: bool = True,
+    include_spatial: bool = True,
     include_weather: bool = False,
     handle_nan: str = "drop",
     test_size: float = 0.2,
     save_model: bool = True,
+    pre_split: Optional[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = None,
 ) -> Dict:
     """
     Train and evaluate XGBoost time model.
@@ -382,11 +434,12 @@ def train_xgboost(
         subsample: Row subsample ratio per tree
         colsample_bytree: Column subsample ratio per tree
         include_temporal: Include temporal features
-        include_operational: Include operational features
+        include_spatial: Include spatial features
         include_weather: Include weather features
         handle_nan: 'drop', 'impute', or 'error'
         test_size: Test set fraction (test); val is fixed at 0.1
         save_model: Save to registry
+        pre_split: Optional (train, val, test) DataFrames to reuse
         
     Returns:
         Dictionary with model, metrics, metadata
@@ -400,7 +453,7 @@ def train_xgboost(
     print("Config:")
     print(f"  max_depth={max_depth}, n_estimators={n_estimators}, learning_rate={learning_rate}")
     print(f"  subsample={subsample}, colsample_bytree={colsample_bytree}")
-    print(f"  temporal={include_temporal}, operational={include_operational}")
+    print(f"  temporal={include_temporal}, spatial={include_spatial}")
     print(f"  weather={include_weather}, handle_nan='{handle_nan}'")
 
     # Load dataset
@@ -420,10 +473,13 @@ def train_xgboost(
         dataset.df = df_filtered
 
     # Split data (train / val / test)
-    train_df, val_df, test_df = dataset.temporal_split(
-        train_frac=1 - test_size - 0.1,
-        val_frac=0.1,
-    )
+    if pre_split is not None:
+        train_df, val_df, test_df = (df.copy() for df in pre_split)
+    else:
+        train_df, val_df, test_df = dataset.temporal_split(
+            train_frac=1 - test_size - 0.1,
+            val_frac=0.1,
+        )
 
     train_test_summary(train_df, test_df, val_df)
 
@@ -439,7 +495,7 @@ def train_xgboost(
         subsample=subsample,
         colsample_bytree=colsample_bytree,
         include_temporal=include_temporal,
-        include_operational=include_operational,
+        include_spatial=include_spatial,
         include_weather=include_weather,
         handle_nan=handle_nan,
     )
@@ -481,7 +537,7 @@ def train_xgboost(
         "subsample": subsample,
         "colsample_bytree": colsample_bytree,
         "include_temporal": include_temporal,
-        "include_operational": include_operational,
+        "include_spatial": include_spatial,
         "include_weather": include_weather,
         "handle_nan": handle_nan,
         "n_features": len(model.feature_cols) if model.feature_cols else 0,
@@ -498,8 +554,8 @@ def train_xgboost(
         feature_groups = []
         if include_temporal:
             feature_groups.append("temporal")
-        if include_operational:
-            feature_groups.append("operational")
+        if include_spatial:
+            feature_groups.append("spatial")
         if include_weather:
             feature_groups.append("weather")
 
@@ -531,7 +587,6 @@ if __name__ == "__main__":
     _ = train_xgboost(
         dataset_name="sample_dataset",
         include_temporal=True,
-        include_operational=True,
         include_weather=False,
         handle_nan="drop",
     )

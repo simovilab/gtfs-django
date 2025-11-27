@@ -5,7 +5,7 @@ Adapts predictions based on recent observations with exponential decay.
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from collections import defaultdict
 import sys
 from pathlib import Path
@@ -164,7 +164,8 @@ def train_ewma(dataset_name: str = "sample_dataset",
                group_by: list = ['route_id', 'stop_sequence'],
                min_observations: int = 3,
                test_size: float = 0.2,
-               save_model: bool = True) -> Dict:
+               save_model: bool = True,
+               pre_split: Optional[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = None) -> Dict:
     """
     Train and evaluate EWMA model.
     
@@ -176,6 +177,7 @@ def train_ewma(dataset_name: str = "sample_dataset",
         min_observations: Minimum observations threshold
         test_size: Test fraction
         save_model: Whether to save
+        pre_split: Optional (train, val, test) DataFrames to reuse
         
     Returns:
         Dictionary with model, metrics, metadata
@@ -204,11 +206,14 @@ def train_ewma(dataset_name: str = "sample_dataset",
         
         dataset.df = df_filtered
     
-    # Split data temporally (important for time series)
-    train_df, val_df, test_df = dataset.temporal_split(
-        train_frac=1-test_size-0.1,
-        val_frac=0.1
-    )
+    if pre_split is not None:
+        train_df, val_df, test_df = (df.copy() for df in pre_split)
+    else:
+        # Split data temporally (important for time series)
+        train_df, val_df, test_df = dataset.temporal_split(
+            train_frac=1-test_size-0.1,
+            val_frac=0.1
+        )
     
     train_test_summary(train_df, test_df, val_df)
     

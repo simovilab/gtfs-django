@@ -15,30 +15,32 @@ from common.utils import format_seconds
 
 def predict_eta(model_key: str,
                 distance_to_stop: float,
+                progress_on_segment: Optional[float] = None,
+                progress_ratio: Optional[float] = None,
                 hour: Optional[int] = None,
                 day_of_week: Optional[int] = None,
                 is_peak_hour: Optional[bool] = None,
                 is_weekend: Optional[bool] = None,
                 is_holiday: Optional[bool] = None,
-                headway_seconds: Optional[float] = None,
-                current_speed_kmh: Optional[float] = None,
                 temperature_c: Optional[float] = None,
-                precipitation_mm: Optional[float] = None) -> Dict:
+                precipitation_mm: Optional[float] = None,
+                wind_speed_kmh: Optional[float] = None) -> Dict:
     """
     Predict ETA using polynomial regression time model.
     
     Args:
         model_key: Model identifier
         distance_to_stop: Distance in meters
+        progress_on_segment: 0-1 fraction along the current stop-to-stop segment
+        progress_ratio: 0-1 fraction along the overall route
         hour: Hour of day (0-23)
         day_of_week: Day of week (0=Monday)
         is_peak_hour: Peak hour flag
         is_weekend: Weekend flag
         is_holiday: Holiday flag
-        headway_seconds: Time since last vehicle
-        current_speed_kmh: Current vehicle speed
         temperature_c: Temperature
         precipitation_mm: Precipitation
+        wind_speed_kmh: Wind speed
         
     Returns:
         Dictionary with prediction and metadata
@@ -53,15 +55,16 @@ def predict_eta(model_key: str,
     
     # Add optional features
     optional_features = {
+        'progress_on_segment': progress_on_segment,
+        'progress_ratio': progress_ratio,
         'hour': hour,
         'day_of_week': day_of_week,
         'is_peak_hour': is_peak_hour,
         'is_weekend': is_weekend,
         'is_holiday': is_holiday,
-        'headway_seconds': headway_seconds,
-        'current_speed_kmh': current_speed_kmh,
         'temperature_c': temperature_c,
-        'precipitation_mm': precipitation_mm
+        'precipitation_mm': precipitation_mm,
+        'wind_speed_kmh': wind_speed_kmh
     }
     
     for key, value in optional_features.items():

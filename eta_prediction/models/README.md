@@ -1,263 +1,162 @@
 # ETA Prediction Models
 
-Complete modeling framework for transit ETA prediction using GTFS-RT data.
+Comprehensive modeling stack that ingests feature-engineered GTFS-RT datasets, trains multiple ETA estimators, evaluates them with consistent metrics, and persists artifacts to a registry for online or batch inference.
+
+---
+
+## Architecture & Workflow
+
+1. **Dataset management** – `common/data.py` loads `datasets/*.parquet`, performs cleaning, and produces temporal or route-based splits. All models rely on `ETADataset.clean_data`, `temporal_split`, and `route_split` to prevent leakage and keep outliers consistent.
+2. **Training entry points** – Each model family exposes a `train_*` routine (e.g., `historical_mean/train.py`, `polyreg_time/train.py`, `xgb/train.py`) that handles filtering, splitting, fitting, and evaluation.
+3. **Evaluation & metrics** – `common/metrics.py` computes the canonical metric suite (MAE/RMSE/R²/bias/coverage). `evaluation/leaderboard.py` and `evaluation/roll_validate.py` enable cross-model comparison and walk-forward validation over time.
+4. **Registry** – `common/registry.py` persists `{model_key}.pkl` artifacts plus `{model_key}_meta.json` metadata while maintaining `trained/registry.json`. `common/keys.py` standardizes identifiers (dataset, feature groups, scope) for reproducibility.
+5. **Inference** – Each model directory contains a `predict.py` that loads registry artifacts, validates required features, and formats outputs for downstream services.
+
+---
+
+## Shared Utilities (`models/common/`)
+
+| Module | Responsibilities |
+| --- | --- |
+| `data.py` | Defines `ETADataset`, cleaning rules (drop missing targets, enforce distance thresholds), splits (`temporal_split`, `route_split`), and feature-selection helpers such as `prepare_features_target`. |
+| `keys.py` | Generates descriptive model keys and experiment identifiers (dataset, feature groups, version, route scope) and parses keys to recover metadata when routing predictions. |
+| `metrics.py` | Implements MAE/RMSE/MAPE/quantile/bias plus `compute_all_metrics`, segmentation tooling (`error_analysis`), and prediction intervals from residuals. |
+| `registry.py` | Saves/loads pickled estimators + JSON metadata, lists/filter models, selects best models per metric/route, and handles deletion/cleanup. |
+| `utils.py` | Logging setup, clipping/smoothing helpers, lag feature generators, formatted metric tables, and convenience functions like `train_test_summary`. |
+
+---
+
+## Model Families
+
+### Historical Mean (`historical_mean/`)
+- Groups ETAs by configurable dimensions (default `['route_id', 'stop_sequence', 'hour']`) and stores lookup tables with coverage metrics.
+- Training pipeline filters datasets, performs temporal splits, and reports validation/test performance before saving to the registry.
+- Prediction API reports whether the output was backed by historical data or fell back to the global mean, making it ideal for baseline comparisons and cold-start monitoring.
+
+### Polynomial Regression – Distance (`polyreg_distance/`)
+- Fits Ridge-regularized polynomial features on `distance_to_stop`. Supports route-specific models (`route_specific=True`) with an optional global fallback.
+- Metadata records polynomial degree, regularization strength, and coefficient samples for transparency.
+- Prediction helper exposes coefficients and supports batch inference with automatic route routing.
+
+### Polynomial Regression – Time Enhanced (`polyreg_time/`)
+- Extends distance regression with optional temporal (`hour`, `day_of_week`, `is_peak_hour`, etc.), spatial (segment progress + identifiers), and weather inputs.
+- Uses `ColumnTransformer` + `PolynomialFeatures` for distance and `StandardScaler` for dense features, with configurable NaN strategies (`drop`, `impute`, or strict `error`).
+- Provides coefficient-based feature importance summaries to highlight influential covariates per dataset/route.
+
+### Exponentially Weighted Moving Average (`ewma/`)
+- Maintains streaming EWMA statistics per `(route_id, stop_sequence [, hour])` key with configurable `alpha` and minimum observation thresholds.
+- Offers online learning through `predict_and_update`, enabling real-time adaptation when ground truth becomes available.
+- Ideal for highly non-stationary congestion patterns where recency outweighs historical aggregates.
+
+### XGBoost Gradient Boosted Trees (`xgb/`)
+- `XGBTimeModel` mirrors the feature-flag system from the time polynomial model (temporal/spatial toggles) but leverages `xgboost.XGBRegressor` for nonlinear interactions.
+- Cleans datasets using the same missing-value audits, exposes feature importance from the trained booster, and supports hyper-parameter tuning (`max_depth`, `n_estimators`, `learning_rate`, subsampling knobs).
+- Prediction API aligns with the polynomial time model so switching model keys requires no payload changes.
+
+---
+
+## Training Orchestration (`train_all_models.py`)
+
+`python models/train_all_models.py --dataset sample_dataset [--by-route] [--models ...] [--no-save]`
+
+- Loads the dataset once, optionally filtered by route, and delegates to each `train_*` routine. Default models: historical mean, distance polyreg, time polyreg, EWMA, and XGBoost.
+- **Global mode** – trains one model per type and prints MAE/RMSE/R² summaries.
+- **Route-specific mode** – iterates each route present in the dataset, trains the selected model types, and prints per-route performance plus correlations between trip volume and error.
+- Pass `--no-save` for dry runs; otherwise results land in the registry with enriched metadata (sample counts, coverage, and configurations).
+
+---
+
+## Evaluation Toolkit (`models/evaluation/`)
+
+- **Leaderboard (`leaderboard.py`)** – Loads trained models from the registry, evaluates each on a consistent test split (temporal or route-based), and prints a ranked table with MAE/RMSE/R², coverage, and bias. Use `quick_compare([...], dataset)` for one-liners.
+- **Rolling validation (`roll_validate.py`)** – Implements walk-forward validation across sliding temporal windows to measure stability over time. Accepts custom `train_fn`/`predict_fn` callables so any model type can be stress-tested.
+- **Plotting helpers** – Optional Matplotlib visualizations to inspect MAE drift, coverage trends, or metric distributions across windows.
+
+---
+
+## Model Registry & Keys
+
+- `ModelKey.generate(...)` assembles identifiers of the form `polyreg_time_sample_temporal-spatial_global_20250126_143022_degree=2`. Keys capture dataset, feature groups, scope (global vs. `route_{id}`), timestamp, and supplemental hyper-parameters to simplify filtering and reproducibility.
+- `ModelRegistry.save_model` writes `{model_key}.pkl` (pickled estimator) and `{model_key}_meta.json` (config + metrics) while updating `trained/registry.json`. Metadata contains dataset info, route scope, sample counts, evaluation results, and custom training attributes.
+- Consumers can:
+  ```python
+  from models.common.registry import get_registry
+  registry = get_registry()
+  df = registry.list_models(model_type='polyreg_time')
+  best_key = registry.get_best_model(metric='test_mae_seconds', route_id='global')
+  model = registry.load_model(best_key)
+  meta = registry.load_metadata(best_key)
+  ```
+- `check_registry.py` provides diagnostics (permissions, file counts, distribution of model types) and an optional save/load smoke test.
+
+---
+
+## Prediction Interfaces
+
+Each model package ships with a `predict.py` tailored to its feature requirements:
+
+| Module | Required Inputs | Notes |
+| --- | --- | --- |
+| `historical_mean.predict.predict_eta` | `route_id`, `stop_sequence`, `hour` (+ optional weekday/peak flags) | Returns coverage flag and fallback status. |
+| `polyreg_distance.predict.predict_eta` | `distance_to_stop` (+ `route_id` for route-specific models) | Exposes polynomial coefficients for transparency. |
+| `polyreg_time.predict.predict_eta` | `distance_to_stop` plus any temporal/spatial/weather signals enabled during training | `features_used` documents the expected payload. |
+| `ewma.predict.predict_eta` | `route_id`, `stop_sequence` (+ optional `hour`) | Supports `predict_and_update` for online learning. |
+| `xgb.predict.predict_eta` | Same schema as the time polynomial model | Uses XGBoost’s native handling for missing optional fields. |
+
+Batch helpers (`batch_predict`) are available in every module when you need to score pandas DataFrames efficiently.
+
+---
+
+## Example Workflow
+
+```python
+from models.train_all_models import train_all_models
+from models.common.registry import get_registry
+from models.evaluation.leaderboard import quick_compare
+from models.xgb.predict import predict_eta as predict_xgb
+
+# 1. Train baselines on pre-built parquet
+train_all_models(
+    dataset_name="sample_dataset",
+    by_route=False,
+    model_types=["historical_mean", "polyreg_time", "xgboost"]
+)
+
+# 2. Inspect registry and select best global model
+registry = get_registry()
+best_key = registry.get_best_model(metric="test_mae_seconds", route_id="global")
+
+# 3. Run inference
+prediction = predict_xgb(
+    model_key=best_key,
+    distance_to_stop=1200,
+    hour=8,
+    is_peak_hour=True
+)
+print(prediction["eta_formatted"])
+
+# 4. Compare candidates on a hold-out split
+candidate_keys = registry.list_models().head(4)["model_key"].tolist()
+leaderboard_df = quick_compare(candidate_keys, dataset_name="sample_dataset")
+```
+
+---
 
 ## Directory Structure
 
 ```
 models/
-├── README.md                          # This file
-├── train_all_models.py               # Main training script
-├── common/                           # Shared utilities
-│   ├── data.py                       # Dataset loading and preprocessing
-│   ├── keys.py                       # Model key generation
-│   ├── metrics.py                    # Evaluation metrics
-│   ├── registry.py                   # Model storage and retrieval
-│   └── utils.py                      # Helper functions
-├── evaluation/                       # Model evaluation tools
-│   ├── leaderboard.py               # Model comparison
-│   └── roll_validate.py             # Rolling window validation
-├── historical_mean/                  # Historical mean baseline
-│   ├── train.py                     
-│   └── predict.py
-├── polyreg_distance/                # Polynomial regression (distance)
-│   ├── train.py
-│   └── predict.py
-├── polyreg_time/                    # Polynomial regression (time)
-│   ├── train.py
-│   └── predict.py
-├── ewma/                            # Exponential weighted moving average
-│   ├── train.py
-│   └── predict.py
-└── trained/                         # Saved models (created automatically)
-    ├── {model_key}.pkl
-    ├── {model_key}_meta.json
-    └── registry.json
+├── common/                # Dataset + registry + metric utilities
+├── evaluation/            # Leaderboard + rolling validation + plotting
+├── historical_mean/       # Baseline mean model (train/predict)
+├── polyreg_distance/      # Distance-only polynomial regression
+├── polyreg_time/          # Distance + temporal/spatial regression
+├── ewma/                  # Exponential smoothing model with online updates
+├── xgb/                   # Gradient-boosted tree regressor
+├── train_all_models.py    # CLI orchestrator
+├── example_workflow.py    # Import barrel + quick-start helpers
+├── check_registry.py      # Diagnostics for trained/ registry folder
+└── trained/               # Auto-created artifacts (PKL + JSON + registry index)
 ```
 
-## Usage
-
-### 1. Train All Baseline Models
-
-```bash
-# Train all baseline models on sample dataset
-python train_all_models.py --dataset sample_dataset --mode baseline
-
-# Train baseline + advanced configurations
-python train_all_models.py --dataset sample_dataset --mode all
-
-# Train without saving (dry run)
-python train_all_models.py --dataset sample_dataset --no-save
-```
-
-### 2. Train Individual Models
-
-```python
-from models.polyreg_time.train import train_polyreg_time
-
-# Train polynomial regression with time features
-result = train_polyreg_time(
-    dataset_name="sample_dataset",
-    poly_degree=2,
-    include_temporal=True,
-    include_operational=True
-)
-
-print(f"Test MAE: {result['metrics']['test_mae_minutes']:.2f} minutes")
-```
-
-### 3. Make Predictions
-
-```python
-from models.polyreg_time.predict import predict_eta
-
-# Single prediction
-prediction = predict_eta(
-    model_key=f'{MODEL_KEY}',
-    distance_to_stop=1500.0,  # meters
-    hour=8,
-    is_peak_hour=True,
-    current_speed_kmh=25.0
-)
-
-print(f"ETA: {prediction['eta_formatted']}")
-```
-
-### 4. Compare Models
-
-```python
-from models.evaluation.leaderboard import quick_compare
-
-model_keys = [
-    "historical_mean_...",
-    "polyreg_distance_...",
-    "polyreg_time_...",
-    "ewma_..."
-]
-
-results = quick_compare(model_keys, "sample_dataset")
-```
-
-## Model Types
-
-### 1. Historical Mean (`historical_mean/`)
-
-**Description**: Baseline model using historical average ETAs grouped by route, stop, and time features.
-
-**Example**:
-```python
-from models.historical_mean.train import train_historical_mean
-
-result = train_historical_mean(
-    group_by=['route_id', 'stop_sequence', 'hour', 'day_of_week']
-)
-```
-
----
-
-### 2. Polynomial Regression - Distance (`polyreg_distance/`)
-
-**Description**: Polynomial regression on distance to stop with optional route-specific models.
-
-**Example**:
-```python
-from models.polyreg_distance.train import train_polyreg_distance
-
-result = train_polyreg_distance(
-    degree=2,
-    route_specific=True
-)
-```
-
----
-
-### 3. Polynomial Regression - Time (`polyreg_time/`)
-
-**Description**: Enhanced polynomial regression combining distance with temporal and operational features.
-
-**Example**:
-```python
-from models.polyreg_time.train import train_polyreg_time
-
-result = train_polyreg_time(
-    poly_degree=2,
-    include_temporal=True,
-    include_operational=True,
-    include_weather=False
-)
-```
-
----
-
-### 4. EWMA (`ewma/`)
-
-**Description**: Exponentially weighted moving average that adapts predictions based on recent observations.
-
-**Example**:
-```python
-from models.ewma.train import train_ewma
-
-result = train_ewma(
-    alpha=0.3,  # Higher = faster adaptation
-    group_by=['route_id', 'stop_sequence', 'hour']
-)
-```
-
-## Evaluation
-
-### Metrics
-
-All models are evaluated on:
-
-- **MAE (Mean Absolute Error)**: Primary metric, in seconds and minutes
-- **RMSE (Root Mean Squared Error)**: Penalizes large errors
-- **R²**: Goodness of fit
-- **Within Threshold**: % predictions within 60s, 120s, 300s
-- **Bias**: Over/under-prediction tendency
-- **Quantile Errors**: 50th, 90th, 95th percentile errors
-
-### Rolling Window Validation
-
-Test models on sequential time windows:
-
-```python
-from models.evaluation.roll_validate import quick_rolling_validate
-from models.ewma.train import EWMAModel
-
-results = quick_rolling_validate(
-    model_class=EWMAModel,
-    model_params={'alpha': 0.3},
-    train_window_days=7
-)
-```
-
-### Leaderboard
-
-Compare multiple models:
-
-```python
-from models.evaluation.leaderboard import ModelLeaderboard
-
-leaderboard = ModelLeaderboard()
-df = leaderboard.compare_models(
-    model_keys=['model1', 'model2', 'model3'],
-    dataset_name="sample_dataset"
-)
-leaderboard.print_leaderboard(df)
-```
-
-## Model Registry
-
-All trained models are stored in the registry with metadata:
-
-```python
-from models.common.registry import get_registry
-
-registry = get_registry()
-
-# List all models
-models = registry.list_models()
-
-# Load a model
-model = registry.load_model("polyreg_time_...")
-
-# Get metadata
-metadata = registry.load_metadata("polyreg_time_...")
-
-# Get best model by metric
-best_key = registry.get_best_model(metric='test_mae_seconds')
-```
-
-## Feature Engineering Integration
-
-Models use features from the `feature_engineering` module:
-
-**Temporal features** (`temporal.py`):
-- hour, day_of_week, is_weekend, is_holiday, is_peak_hour
-
-**Spatial features** (`spatial.py`):
-- distance_to_stop, bearing_to_stop, progress_on_segment
-
-**Operational features** (`operational.py`):
-- headway_seconds, avg_speed_last_10min, vehicles_on_route
-
-**Weather features** (`weather.py`):
-- temperature_c, precipitation_mm, wind_speed_kmh
-
-See `feature_engineering/README.md` for details.
-
-## Dataset Requirements
-
-Models expect datasets built with `dataset_builder.py` script through the `build_eta_sample` Django command:
-
-**Minimum Required Columns**:
-- `trip_id`, `route_id`, `vehicle_id`, `stop_id`, `stop_sequence`
-- `vp_ts`, `vp_lat`, `vp_lon`
-- `stop_lat`, `stop_lon`, `distance_to_stop`
-- `time_to_arrival_seconds` (target)
-
-**Recommended Columns**:
-- `hour`, `day_of_week`, `is_peak_hour`
-- `headway_seconds`, `current_speed_kmh`
-
-
+Place datasets under `datasets/{name}.parquet`, run the feature-engineering builder beforehand, and execute the modeling scripts within the same Django/ORM environment as the ETA service so shared settings and caches are available.

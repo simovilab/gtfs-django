@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 import pandas as pd
+from typing import Tuple
 
 sys.path.append(str(Path(__file__).parent))
 
@@ -15,6 +16,29 @@ from polyreg_distance.train import train_polyreg_distance
 from polyreg_time.train import train_polyreg_time
 from ewma.train import train_ewma
 from xgb.train import train_xgboost
+
+DEFAULT_TEST_SIZE = 0.2
+DEFAULT_VAL_FRAC = 0.1
+DEFAULT_TRAIN_FRAC = 1.0 - DEFAULT_TEST_SIZE - DEFAULT_VAL_FRAC
+
+
+def _temporal_split_df(df: pd.DataFrame,
+                       train_frac: float,
+                       val_frac: float) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Deterministically split a dataframe by vp_ts."""
+    df_sorted = df.sort_values('vp_ts').reset_index(drop=True)
+    n = len(df_sorted)
+    train_end = int(n * train_frac)
+    val_end = int(n * (train_frac + val_frac))
+    train_df = df_sorted.iloc[:train_end].copy()
+    val_df = df_sorted.iloc[train_end:val_end].copy()
+    test_df = df_sorted.iloc[val_end:].copy()
+    return train_df, val_df, test_df
+
+
+def _clone_splits(splits: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Return deep copies of precomputed splits so callers can mutate freely."""
+    return tuple(split.copy() for split in splits)
 
 
 def train_all_models(dataset_name: str,
@@ -49,8 +73,9 @@ def train_all_models(dataset_name: str,
     print(f"Save: {save}")
     print(f"{'='*80}\n")
     
-    # Load dataset to get routes
+    # Load dataset to get routes / global data
     dataset = load_dataset(dataset_name)
+    dataset.clean_data()
     
     if by_route:
         routes = sorted(dataset.df['route_id'].unique())
@@ -75,6 +100,15 @@ def train_all_models(dataset_name: str,
         for route_id in routes:
             n_trips = route_stats.loc[route_id, 'n_trips']
             n_samples = route_stats.loc[route_id, 'n_samples']
+            route_df = dataset.df[dataset.df['route_id'] == route_id].copy()
+            if route_df.empty:
+                print(f"\nSkipping route {route_id}: no samples after cleaning")
+                continue
+            route_splits = _temporal_split_df(
+                route_df,
+                DEFAULT_TRAIN_FRAC,
+                DEFAULT_VAL_FRAC,
+            )
             
             print(f"\n{'#'*80}")
             print(f"ROUTE {route_id} ({n_trips} trips, {n_samples} samples)".center(80))
@@ -88,7 +122,8 @@ def train_all_models(dataset_name: str,
                     result = train_historical_mean(
                         dataset_name=dataset_name,
                         route_id=route_id,
-                        save_model=save
+                        save_model=save,
+                        pre_split=_clone_splits(route_splits),
                     )
                     route_results['historical_mean'] = result
                     
@@ -98,7 +133,8 @@ def train_all_models(dataset_name: str,
                         dataset_name=dataset_name,
                         route_id=route_id,
                         degree=2,
-                        save_model=save
+                        save_model=save,
+                        pre_split=_clone_splits(route_splits),
                     )
                     route_results['polyreg_distance'] = result
                     
@@ -109,8 +145,8 @@ def train_all_models(dataset_name: str,
                         route_id=route_id,
                         poly_degree=2,
                         include_temporal=True,
-                        include_operational=True,
-                        save_model=save
+                        save_model=save,
+                        pre_split=_clone_splits(route_splits),
                     )
                     route_results['polyreg_time'] = result
                     
@@ -120,7 +156,8 @@ def train_all_models(dataset_name: str,
                         dataset_name=dataset_name,
                         route_id=route_id,
                         alpha=0.3,
-                        save_model=save
+                        save_model=save,
+                        pre_split=_clone_splits(route_splits),
                     )
                     route_results['ewma'] = result
 
@@ -130,7 +167,8 @@ def train_all_models(dataset_name: str,
                     result = train_xgboost(
                         dataset_name=dataset_name,
                         route_id=route_id,
-                        save_model=save
+                        save_model=save,
+                        pre_split=_clone_splits(route_splits),
                     )
                     route_results['xgboost'] = result
                 
@@ -153,6 +191,7 @@ def train_all_models(dataset_name: str,
                 continue
             
             n_trips = route_stats.loc[route_id, 'n_trips']
+            n_samples = route_stats.loc[route_id, 'n_samples']
             
             for model_type in model_types:
                 if model_type in results[route_id]:
@@ -160,6 +199,7 @@ def train_all_models(dataset_name: str,
                     summary_data.append({
                         'route_id': route_id,
                         'n_trips': n_trips,
+                        'n_samples': n_samples,  # NEW: number of observations
                         'model_type': model_type,
                         'test_mae_min': metrics.get('test_mae_minutes', None),
                         'test_rmse_sec': metrics.get('test_rmse_seconds', None),
@@ -168,12 +208,15 @@ def train_all_models(dataset_name: str,
         
         if summary_data:
             summary_df = pd.DataFrame(summary_data)
-            summary_df = summary_df.sort_values(['n_trips', 'model_type'], ascending=[False, True])
+            summary_df = summary_df.sort_values(
+                ['n_trips', 'model_type'],
+                ascending=[False, True]
+            )
             
             print("Performance by Route and Model:")
             print(summary_df.to_string(index=False))
             
-            # Show correlation between training data size and performance
+            # Show correlation between training data size (trips) and performance
             if len(summary_df) > 2:
                 print(f"\n{'='*80}")
                 print("Data Size vs Performance Analysis".center(80))
@@ -184,6 +227,22 @@ def train_all_models(dataset_name: str,
                     if len(model_data) > 1:
                         corr = model_data['n_trips'].corr(model_data['test_mae_min'])
                         print(f"{model_type:20s}: trips vs MAE correlation = {corr:+.3f}")
+
+                # NEW: Correlation between number of observations and performance
+                print(f"\n{'='*80}")
+                print("Observations vs Performance Analysis".center(80))
+                print(f"{'='*80}\n")
+
+                for model_type in model_types:
+                    model_data = summary_df[summary_df['model_type'] == model_type]
+                    if len(model_data) > 1:
+                        corr_mae = model_data['n_samples'].corr(model_data['test_mae_min'])
+                        corr_rmse = model_data['n_samples'].corr(model_data['test_rmse_sec'])
+                        print(
+                            f"{model_type:20s}: "
+                            f"obs vs MAE  = {corr_mae:+.3f}, "
+                            f"obs vs RMSE = {corr_rmse:+.3f}"
+                        )
         
         return results
     
@@ -192,13 +251,18 @@ def train_all_models(dataset_name: str,
         print("Training GLOBAL models across all routes...\n")
         
         results = {}
+        global_splits = dataset.temporal_split(
+            train_frac=DEFAULT_TRAIN_FRAC,
+            val_frac=DEFAULT_VAL_FRAC,
+        )
         
         try:
             if 'historical_mean' in model_types:
                 print("\n>>> Training Historical Mean (global)...")
                 results['historical_mean'] = train_historical_mean(
                     dataset_name=dataset_name,
-                    save_model=save
+                    save_model=save,
+                    pre_split=_clone_splits(global_splits),
                 )
                 
             if 'polyreg_distance' in model_types:
@@ -206,7 +270,8 @@ def train_all_models(dataset_name: str,
                 results['polyreg_distance'] = train_polyreg_distance(
                     dataset_name=dataset_name,
                     degree=2,
-                    save_model=save
+                    save_model=save,
+                    pre_split=_clone_splits(global_splits),
                 )
                 
             if 'polyreg_time' in model_types:
@@ -215,8 +280,8 @@ def train_all_models(dataset_name: str,
                     dataset_name=dataset_name,
                     poly_degree=2,
                     include_temporal=True,
-                    include_operational=True,
-                    save_model=save
+                    save_model=save,
+                    pre_split=_clone_splits(global_splits),
                 )
                 
             if 'ewma' in model_types:
@@ -224,7 +289,8 @@ def train_all_models(dataset_name: str,
                 results['ewma'] = train_ewma(
                     dataset_name=dataset_name,
                     alpha=0.3,
-                    save_model=save
+                    save_model=save,
+                    pre_split=_clone_splits(global_splits),
                 )
 
             # NEW: XGBoost global
@@ -233,7 +299,8 @@ def train_all_models(dataset_name: str,
                 results['xgboost'] = train_xgboost(
                     dataset_name=dataset_name,
                     route_id=None,  # global model
-                    save_model=save
+                    save_model=save,
+                    pre_split=_clone_splits(global_splits),
                 )
         
         except Exception as e:

@@ -5,7 +5,7 @@ Fits polynomial features on distance_to_stop with optional route-specific models
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Ridge
 from sklearn.pipeline import Pipeline
@@ -163,7 +163,8 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
                           alpha: float = 1.0,
                           route_specific: bool = False,
                           test_size: float = 0.2,
-                          save_model: bool = True) -> Dict:
+                          save_model: bool = True,
+                          pre_split: Optional[Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]] = None) -> Dict:
     """
     Train and evaluate polynomial regression distance model.
     
@@ -175,6 +176,7 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
         route_specific: Whether to fit per-route models (ignored if route_id specified)
         test_size: Fraction of data for testing
         save_model: Whether to save to registry
+        pre_split: Optional (train, val, test) DataFrames to reuse
         
     Returns:
         Dictionary with model, metrics, and metadata
@@ -205,11 +207,13 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
         # When training on single route, don't need route_specific flag
         route_specific = False
     
-    # Split data temporally
-    train_df, val_df, test_df = dataset.temporal_split(
-        train_frac=1-test_size-0.1,
-        val_frac=0.1
-    )
+    if pre_split is not None:
+        train_df, val_df, test_df = (df.copy() for df in pre_split)
+    else:
+        train_df, val_df, test_df = dataset.temporal_split(
+            train_frac=1-test_size-0.1,
+            val_frac=0.1
+        )
     
     train_test_summary(train_df, test_df, val_df)
     
