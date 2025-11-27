@@ -1,116 +1,124 @@
 # tests/test_spatial.py
-import math
 import pytest
 
 from feature_engineering.spatial import (
-    calculate_distance_features,
-    get_route_features,
+    calculate_distance_features_with_shape,
+    ShapePolyline,
 )
 
-# --- helpers ---
+
 def approx_equal(a, b, tol):
     return abs(a - b) <= tol
 
 
-def test_distance_and_bearing_basic_equator_east():
-    vp = {"lat": 0.0, "lon": 0.0, "bearing": 90.0}
-    stop = {"stop_id": "A", "lat": 0.0, "lon": 1.0}
-    feats = calculate_distance_features(vp, stop, None)
+def test_basic_distance_and_progress_without_shape():
+    vp = {"lat": 0.0, "lon": 0.0}
+    stop = {"stop_id": "A", "lat": 0.0, "lon": 1.0, "stop_order": 2}
+    next_stop = {"stop_id": "B", "lat": 0.0, "lon": 2.0}
 
-    # Distance 1 degree of lon at equator ~ 111.32 km
-    assert approx_equal(feats["distance_to_stop"], 111_320, 600)  # ±600 m tolerance
-    # Bearing from (0,0) to (0,1) ~ 90°
-    assert approx_equal(feats["bearing_to_stop"], 90.0, 2.0)
-    # With vbearing=90 and threshold 35°, approaching should be True
-    assert feats["is_approaching"] is True
-    # No next_stop provided
-    assert feats["distance_to_next_stop"] is None
-    assert feats["segment_id"] is None
-    assert feats["progress_on_segment"] is None
+    feats = calculate_distance_features_with_shape(
+        vp,
+        stop,
+        next_stop,
+        shape=None,
+        vehicle_stop_order=2,
+        total_segments=10,
+    )
 
-
-def test_is_approaching_false_when_heading_away():
-    vp = {"lat": 0.0, "lon": 0.0, "bearing": 270.0}  # heading west
-    stop = {"stop_id": "A", "lat": 0.0, "lon": 1.0}  # east
-    feats = calculate_distance_features(vp, stop, None)
-    assert feats["is_approaching"] is False
+    assert approx_equal(feats["distance_to_stop"], 111_320, 600)
+    assert 0.0 <= feats["progress_on_segment"] <= 1.0
+    assert 0.15 <= feats["progress_ratio"] <= 0.25  # 2/10 with some within segment progress
 
 
-def test_progress_on_segment_midpoint():
-    # Segment along equator from lon 0 -> 1 (east)
-    stop = {"stop_id": "A", "lat": 0.0, "lon": 0.0}
-    next_stop = {"stop_id": "B", "lat": 0.0, "lon": 1.0}
-    vp = {"lat": 0.0, "lon": 0.5, "bearing": 90.0}  # halfway between
-
-    feats = calculate_distance_features(vp, stop, next_stop)
-    assert 0.4 <= feats["progress_on_segment"] <= 0.6  # ~0.5 within slack
-    # Distance to next ~ 0.5 deg lon at equator ~ 55.66 km
-    assert approx_equal(feats["distance_to_next_stop"], 55_660, 600)
-
-
-def test_progress_is_clamped_to_bounds():
-    stop = {"stop_id": "A", "lat": 0.0, "lon": 0.0}
+def test_progress_clamped_when_outside_segment():
+    stop = {"stop_id": "A", "lat": 0.0, "lon": 0.0, "stop_order": 5}
     next_stop = {"stop_id": "B", "lat": 0.0, "lon": 1.0}
 
-    # Before starting segment (far behind the first stop)
-    vp_before = {"lat": 0.0, "lon": -1.0, "bearing": 90.0}
-    feats_before = calculate_distance_features(vp_before, stop, next_stop)
-    assert feats_before["progress_on_segment"] == 0.0  # clamped
+    vp_before = {"lat": 0.0, "lon": -1.0}
+    feats_before = calculate_distance_features_with_shape(
+        vp_before,
+        stop,
+        next_stop,
+        shape=None,
+        vehicle_stop_order=5,
+        total_segments=8,
+    )
+    assert feats_before["progress_on_segment"] == 0.0
 
-    # Way past the next stop
-    vp_past = {"lat": 0.0, "lon": 3.0, "bearing": 90.0}
-    feats_past = calculate_distance_features(vp_past, stop, next_stop)
-    assert feats_past["progress_on_segment"] == 0.0  # proxy negative → clamped to 0.0
+    vp_past = {"lat": 0.0, "lon": 3.0}
+    feats_past = calculate_distance_features_with_shape(
+        vp_past,
+        stop,
+        next_stop,
+        shape=None,
+        vehicle_stop_order=5,
+        total_segments=8,
+    )
+    assert feats_past["progress_on_segment"] == 0.0
 
 
-def test_segment_id_stability():
-    stop = {"stop_id": "S1", "lat": 0.0, "lon": 0.0}
-    next_stop = {"stop_id": "S2", "lat": 0.0, "lon": 1.0}
-    vp = {"lat": 0.0, "lon": 0.1}
-
-    f1 = calculate_distance_features(vp, stop, next_stop)
-    f2 = calculate_distance_features(vp, stop, next_stop)
-    assert f1["segment_id"] == f2["segment_id"]
-    assert isinstance(f1["segment_id"], str)
-    assert len(f1["segment_id"]) == 12  # short sha1 hex as implemented
-
-
-def test_zero_length_segment_progress_zero():
-    # stop == next_stop (data quirk)
-    stop = {"stop_id": "S", "lat": 9.9, "lon": -84.0}
+def test_zero_length_segment_defaults():
+    stop = {"stop_id": "S", "lat": 9.9, "lon": -84.0, "stop_order": 3}
     next_stop = {"stop_id": "S", "lat": 9.9, "lon": -84.0}
     vp = {"lat": 9.9, "lon": -84.001}
 
-    feats = calculate_distance_features(vp, stop, next_stop)
+    feats = calculate_distance_features_with_shape(
+        vp,
+        stop,
+        next_stop,
+        shape=None,
+        vehicle_stop_order=3,
+        total_segments=5,
+    )
+
     assert feats["progress_on_segment"] == 0.0
-    assert feats["distance_to_next_stop"] >= 0.0
+    assert feats["distance_to_next_stop"] == 0.0
+    assert approx_equal(feats["progress_ratio"], 3 / 5, 0.01)
 
 
-def test_get_route_features_with_provided_stops():
-    # Three stops along the equator: (0,0) → (0,1) → (0,2)
-    stops = [
-        {"stop_id": "A", "lat": 0.0, "lon": 0.0},
-        {"stop_id": "B", "lat": 0.0, "lon": 1.0},
-        {"stop_id": "C", "lat": 0.0, "lon": 2.0},
-    ]
-    feats = get_route_features("routeX", stops_in_order=stops)
+def test_shape_based_progress_used_when_available():
+    shape = ShapePolyline([
+        (0.0, 0.0),
+        (0.0, 1.0),
+        (0.0, 2.0),
+    ])
+    vp = {"lat": 0.0, "lon": 0.5}
+    stop = {"stop_id": "B", "lat": 0.0, "lon": 1.0, "stop_order": 1}
+    next_stop = {"stop_id": "C", "lat": 0.0, "lon": 2.0}
 
-    assert feats["total_stops"] == 3
+    feats = calculate_distance_features_with_shape(
+        vp,
+        stop,
+        next_stop,
+        shape=shape,
+        vehicle_stop_order=1,
+        total_segments=2,
+    )
 
-    # Each leg ~111.32 km → total ~222.64 km
-    assert approx_equal(feats["route_length_km"], 222.64, 1.5)  # ±1.5 km tolerance
+    assert 0.24 <= feats["shape_progress"] <= 0.26
+    assert feats["progress_ratio"] == pytest.approx(feats["shape_progress"])
+    assert feats["shape_distance_to_stop"] > 0
+    assert feats["cross_track_error"] < 50
 
-    # Avg spacing ~111.32 km in meters
-    assert approx_equal(feats["avg_stop_spacing"], 111_320, 800)
 
+def test_shape_progress_overrides_progress_on_segment():
+    shape = ShapePolyline([
+        (0.0, 0.0),
+        (0.5, 0.5),
+        (1.0, 1.0),
+    ])
+    vp = {"lat": 0.25, "lon": 0.25}
+    stop = {"stop_id": "B", "lat": 0.5, "lon": 0.5, "stop_order": 1}
+    next_stop = {"stop_id": "C", "lat": 1.0, "lon": 1.0}
 
-def test_get_route_features_insufficient_stops():
-    feats0 = get_route_features("r0", stops_in_order=[])
-    assert feats0["total_stops"] == 0
-    assert feats0["route_length_km"] == 0.0
-    assert feats0["avg_stop_spacing"] == 0.0
+    feats = calculate_distance_features_with_shape(
+        vp,
+        stop,
+        next_stop,
+        shape=shape,
+        vehicle_stop_order=1,
+        total_segments=2,
+    )
 
-    feats1 = get_route_features("r1", stops_in_order=[{"stop_id": "A", "lat": 9.9, "lon": -84.1}])
-    assert feats1["total_stops"] == 1
-    assert feats1["route_length_km"] == 0.0
-    assert feats1["avg_stop_spacing"] == 0.0
+    assert feats["progress_on_segment"] == pytest.approx(0.0)
+    assert 0.24 <= feats["shape_progress"] <= 0.26
