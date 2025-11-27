@@ -1,17 +1,12 @@
-# feature_engineering/spatial.py
+# feature_engineering/spatial.py - Shape-informed progress extension
 from __future__ import annotations
 import math
-import hashlib
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, List, Tuple, Optional
 
 EARTH_RADIUS_M = 6_371_000.0
 
-# --------- small helpers ---------
 def _deg2rad(x: float) -> float:
     return x * math.pi / 180.0
-
-def _rad2deg(x: float) -> float:
-    return x * 180.0 / math.pi
 
 def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle distance in meters."""
@@ -22,175 +17,356 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return EARTH_RADIUS_M * c
 
-def _initial_bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Forward azimuth from point1 to point2 (0..360)."""
-    φ1, φ2 = _deg2rad(lat1), _deg2rad(lat2)
-    dλ = _deg2rad(lon2 - lon1)
-    y = math.sin(dλ) * math.cos(φ2)
-    x = math.cos(φ1) * math.sin(φ2) - math.sin(φ1) * math.cos(φ2) * math.cos(dλ)
-    θ = math.atan2(y, x)
-    brg = (_rad2deg(θ) + 360.0) % 360.0
-    return brg
 
-def _angle_diff_deg(a: float, b: float) -> float:
-    """Smallest absolute difference between two headings (0..180)."""
-    d = abs((a - b + 180.0) % 360.0 - 180.0)
-    return d
+class ShapePolyline:
+    """
+    Represents a route shape as an ordered sequence of (lat, lon) points.
+    Provides methods to project vehicle positions onto the polyline and compute
+    accurate progress along the route.
+    """
+    
+    def __init__(self, points: List[Tuple[float, float]]):
+        """
+        Args:
+            points: List of (lat, lon) tuples in route order
+        """
+        if len(points) < 2:
+            raise ValueError("Shape must have at least 2 points")
+        
+        self.points = points
+        self._segment_lengths = self._compute_segment_lengths()
+        self._cumulative_distances = self._compute_cumulative_distances()
+        self.total_length = self._cumulative_distances[-1]
+    
+    def _compute_segment_lengths(self) -> List[float]:
+        """Compute distance for each segment between consecutive points."""
+        lengths = []
+        for i in range(len(self.points) - 1):
+            lat1, lon1 = self.points[i]
+            lat2, lon2 = self.points[i + 1]
+            lengths.append(_haversine_m(lat1, lon1, lat2, lon2))
+        return lengths
+    
+    def _compute_cumulative_distances(self) -> List[float]:
+        """Compute cumulative distance from start to each point."""
+        cumulative = [0.0]
+        for length in self._segment_lengths:
+            cumulative.append(cumulative[-1] + length)
+        return cumulative
+    
+    def project_point(self, lat: float, lon: float) -> Dict:
+        """
+        Project a point onto the polyline, finding the closest position.
+        
+        Args:
+            lat, lon: Point to project
+            
+        Returns:
+            {
+                'distance_along_shape': meters from shape start,
+                'cross_track_distance': perpendicular distance from shape (meters),
+                'closest_segment_idx': index of nearest segment,
+                'progress': normalized progress [0, 1]
+            }
+        """
+        min_dist = float('inf')
+        best_segment_idx = 0
+        best_projection_dist = 0.0
+        
+        # Check each segment
+        for i in range(len(self.points) - 1):
+            lat1, lon1 = self.points[i]
+            lat2, lon2 = self.points[i + 1]
+            
+            # Project point onto this segment
+            proj_info = self._project_onto_segment(
+                lat, lon, lat1, lon1, lat2, lon2
+            )
+            
+            if proj_info['distance'] < min_dist:
+                min_dist = proj_info['distance']
+                best_segment_idx = i
+                best_projection_dist = proj_info['distance_along_segment']
+        
+        # Calculate total distance along shape to projection point
+        distance_along_shape = (
+            self._cumulative_distances[best_segment_idx] + best_projection_dist
+        )
+        
+        # Normalized progress
+        progress = distance_along_shape / self.total_length if self.total_length > 0 else 0.0
+        
+        return {
+            'distance_along_shape': distance_along_shape,
+            'cross_track_distance': min_dist,
+            'closest_segment_idx': best_segment_idx,
+            'progress': min(1.0, max(0.0, progress))
+        }
+    
+    def _project_onto_segment(
+        self, 
+        lat: float, lon: float,
+        lat1: float, lon1: float,
+        lat2: float, lon2: float
+    ) -> Dict:
+        """
+        Project point onto a single segment, finding perpendicular distance
+        and position along segment.
+        
+        Uses simplified planar approximation (accurate for segments < 10km).
+        """
+        # Convert to approximate planar coordinates (meters from segment start)
+        # This is accurate enough for typical transit segment lengths
+        avg_lat = (lat1 + lat2) / 2
+        meters_per_deg_lat = 111320.0
+        meters_per_deg_lon = 111320.0 * math.cos(_deg2rad(avg_lat))
+        
+        # Segment vector in meters
+        seg_x = (lon2 - lon1) * meters_per_deg_lon
+        seg_y = (lat2 - lat1) * meters_per_deg_lat
+        seg_length_sq = seg_x**2 + seg_y**2
+        
+        if seg_length_sq < 1e-6:  # Degenerate segment
+            dist = _haversine_m(lat, lon, lat1, lon1)
+            return {'distance': dist, 'distance_along_segment': 0.0}
+        
+        # Vector from segment start to point
+        dx = (lon - lon1) * meters_per_deg_lon
+        dy = (lat - lat1) * meters_per_deg_lat
+        
+        # Project onto segment: dot product / length^2
+        t = (dx * seg_x + dy * seg_y) / seg_length_sq
+        t = max(0.0, min(1.0, t))  # Clamp to segment
+        
+        # Closest point on segment
+        proj_x = lon1 + t * (lon2 - lon1)
+        proj_y = lat1 + t * (lat2 - lat1)
+        
+        # Distance from point to projection
+        dist = _haversine_m(lat, lon, proj_y, proj_x)
+        
+        # Distance along segment to projection
+        seg_length = math.sqrt(seg_length_sq)
+        distance_along_segment = t * seg_length
+        
+        return {
+            'distance': dist,
+            'distance_along_segment': distance_along_segment
+        }
+    
+    def get_distance_between_stops(
+        self, 
+        stop1_lat: float, 
+        stop1_lon: float,
+        stop2_lat: float,
+        stop2_lon: float
+    ) -> float:
+        """
+        Get shape distance between two stops (more accurate than haversine).
+        """
+        proj1 = self.project_point(stop1_lat, stop1_lon)
+        proj2 = self.project_point(stop2_lat, stop2_lon)
+        return abs(proj2['distance_along_shape'] - proj1['distance_along_shape'])
 
-def _clamp(x: float, a: float, b: float) -> float:
-    return max(a, min(b, x))
 
-def _segment_id(stop_id: str, next_stop_id: str) -> str:
-    """Stable compact id for (stop_id, next_stop_id)."""
-    return hashlib.sha1(f"{stop_id}|{next_stop_id}".encode("utf-8")).hexdigest()[:12]
-
-# --------- public API ---------
-def calculate_distance_features(
-    vehicle_position: Dict, stop: Dict, next_stop: Optional[Dict]
+def calculate_distance_features_with_shape(
+    vehicle_position: Dict,
+    stop: Dict,
+    next_stop: Optional[Dict],
+    shape: Optional[ShapePolyline] = None,
+    vehicle_stop_order: Optional[int] = None,
+    total_segments: Optional[int] = None,
 ) -> Dict:
     """
-    Args (minimal expected keys):
+    Enhanced version that uses shape data when available.
+    
+    Args:
         vehicle_position: {'lat': float, 'lon': float, 'bearing': Optional[float]}
-        stop:             {'stop_id': str, 'lat': float, 'lon': float}
-        next_stop:        {'stop_id': str, 'lat': float, 'lon': float} or None
-
+        stop: {'stop_id': str, 'lat': float, 'lon': float, 'stop_order': Optional[int]}
+        next_stop: {'stop_id': str, 'lat': float, 'lon': float} or None
+        shape: ShapePolyline instance or None
+        vehicle_stop_order: 0-based index of the closest upstream stop (optional)
+        total_segments: Total number of stop-to-stop segments in trip (optional)
+        
     Returns:
-        {
-          'distance_to_stop': meters,
-          'distance_to_next_stop': meters or None,
-          'bearing_to_stop': degrees 0..360,
-          'is_approaching': bool,
-          'segment_id': str or None,
-          'progress_on_segment': float in [0,1] or None
-        }
+        Same as calculate_distance_features() but with additional shape-based fields:
+        - 'shape_progress': accurate progress along route shape [0, 1]
+        - 'shape_distance_to_stop': along-shape distance to stop (meters)
+        - 'cross_track_error': perpendicular distance from route (meters)
+        - 'progress_ratio': coarse fallback progress when shape is missing
     """
     vlat, vlon = float(vehicle_position["lat"]), float(vehicle_position["lon"])
-    vbearing = vehicle_position.get("bearing")  # degrees or None
-
     slat, slon = float(stop["lat"]), float(stop["lon"])
-    d_to_stop = _haversine_m(vlat, vlon, slat, slon)
-    brg_to_stop = _initial_bearing_deg(vlat, vlon, slat, slon)
-
-    # Approaching: if vehicle heading (if present) is roughly aligned with the direction to the stop
-    # Threshold = 35° is a good default; tweak per your data.
-    is_approaching = False
-    if vbearing is not None:
-        is_approaching = _angle_diff_deg(vbearing, brg_to_stop) <= 35.0
-
-    # Defaults for next stop / segment progress
-    dist_to_next = None
-    seg_id = None
-    progress = None
-
+    
+    # Base features (always computed)
+    result = {
+        'distance_to_stop': _haversine_m(vlat, vlon, slat, slon),
+        'distance_to_next_stop': None,
+        'progress_on_segment': None,
+        'progress_ratio': None,
+        'shape_progress': None,
+        'shape_distance_to_stop': None,
+        'cross_track_error': None,
+    }
+    
     if next_stop is not None:
         nlat, nlon = float(next_stop["lat"]), float(next_stop["lon"])
-        dist_to_next = _haversine_m(vlat, vlon, nlat, nlon)
-        seg_id = _segment_id(str(stop["stop_id"]), str(next_stop["stop_id"]))
-
-        # Segment length (stop -> next_stop)
         seg_len = _haversine_m(slat, slon, nlat, nlon)
-
-        # A robust, simple proxy for along-segment progress when you don't have shape polylines:
-        # assume vehicle is moving from stop -> next_stop; progress ~ 1 - (dist to next_stop / segment_len)
-        # This behaves well except for large detours; clamp to [0,1].
-        if seg_len > 0:
-            proxy = 1.0 - (dist_to_next / seg_len)
-            # If the bus hasn’t departed the current stop yet, we might get negative values; clamp.
-            progress = _clamp(proxy, 0.0, 1.0)
+        if seg_len == 0.0:
+            result['distance_to_next_stop'] = 0.0
         else:
-            progress = 0.0
+            result['distance_to_next_stop'] = _haversine_m(vlat, vlon, nlat, nlon)
+    
+    # Simple progress proxy if we have next stop but no shape
+    if result['progress_on_segment'] is None and next_stop is not None and result['distance_to_next_stop'] is not None:
+        nlat, nlon = float(next_stop["lat"]), float(next_stop["lon"])
+        seg_len = _haversine_m(slat, slon, nlat, nlon)
+        if seg_len > 0:
+            progress = 1.0 - (result['distance_to_next_stop'] / seg_len)
+            result['progress_on_segment'] = max(0.0, min(1.0, progress))
+        else:
+            result['progress_on_segment'] = 0.0
 
-        # Optional refinement: if vehicle is clearly closer to the next_stop than to stop, bias toward >0.5
-        # (Keeps progress monotone as it passes the midpoint)
-        # Uncomment if you find it helpful:
-        # if dist_to_next < d_to_stop:
-        #     progress = max(progress, 0.5)
+    # Shape-based features (if shape available)
+    if shape is not None:
+        vehicle_proj = shape.project_point(vlat, vlon)
+        stop_proj = shape.project_point(slat, slon)
+        
+        # Distance along shape from vehicle to stop
+        shape_dist_to_stop = stop_proj['distance_along_shape'] - vehicle_proj['distance_along_shape']
+        
+        result.update({
+            'shape_progress': vehicle_proj['progress'],
+            'shape_distance_to_stop': max(0, shape_dist_to_stop),  # Don't allow negative
+            'cross_track_error': vehicle_proj['cross_track_distance'],
+            'progress_ratio': vehicle_proj['progress'],
+        })
+        
+        # If we have next_stop, compute segment progress along shape
+        if next_stop is not None:
+            next_proj = shape.project_point(nlat, nlon)
+            segment_length = next_proj['distance_along_shape'] - stop_proj['distance_along_shape']
+            
+            if segment_length > 0:
+                # How far past current stop along shape
+                past_stop = vehicle_proj['distance_along_shape'] - stop_proj['distance_along_shape']
+                result['progress_on_segment'] = max(0.0, min(1.0, past_stop / segment_length))
+            else:
+                result['progress_on_segment'] = 0.0
+    # Fallback progress_ratio using stop order metadata
+    if result['progress_ratio'] is None:
+        order = vehicle_stop_order
+        if order is None:
+            order = stop.get("vehicle_stop_order") or stop.get("stop_order")
+        segments = total_segments
+        if segments is None:
+            segments = stop.get("total_segments")
+        if order is not None and segments:
+            completed_segments = max(float(order), 0.0)
+            progress_within = result['progress_on_segment'] or 0.0
+            denom = max(float(segments), 1.0)
+            ratio = (completed_segments + progress_within) / denom
+            result['progress_ratio'] = max(0.0, min(1.0, ratio))
 
-    return {
-        "distance_to_stop": d_to_stop,
-        "distance_to_next_stop": dist_to_next,
-        "bearing_to_stop": brg_to_stop,
-        "is_approaching": is_approaching,
-        "segment_id": seg_id,
-        "progress_on_segment": progress,
-    }
+    return result
 
 
-def get_route_features(
-    route_id: str,
-    *,
-    conn=None,
-    stops_in_order: Optional[Iterable[Dict[str, float]]] = None,
-) -> Dict:
+# ==================== Helper: Load shapes from GTFS ====================
+
+def load_shape_from_gtfs(shape_id: str, conn) -> ShapePolyline:
     """
-    Compute per-route geometry features.
-
-    Two ways to use:
-      1) Pass a DB connection (psycopg2 / asyncpg) via `conn` to fetch ordered stops from GTFS tables.
-      2) Or pass `stops_in_order` as an iterable of dicts:
-         [{'stop_id': 'A', 'lat': ..., 'lon': ...}, ..., {'stop_id':'Z', ...}]
-
+    Load a shape polyline from GTFS shapes table.
+    
+    Args:
+        shape_id: GTFS shape_id
+        conn: Database connection (psycopg2/asyncpg)
+        
     Returns:
-        - total_stops: int
-        - route_length_km: float
-        - avg_stop_spacing: meters (mean of consecutive inter-stop distances; 0 if <2 stops)
-    """
-    if stops_in_order is None and conn is None:
-        raise ValueError("Provide either `conn` or `stops_in_order`.")
-
-    if stops_in_order is None:
-        # --- Postgres path (expects your schema naming) ---
-        # Adjust table/column names if needed:
-        # sch_pipeline_routestop(route_id, stop_id, stop_sequence)
-        # sch_pipeline_stop(stop_id, stop_lat, stop_lon)
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT rs.stop_id, s.stop_lat, s.stop_lon
-                FROM sch_pipeline_routestop rs
-                JOIN sch_pipeline_stop s ON s.stop_id = rs.stop_id
-                WHERE rs.route_id = %s
-                ORDER BY rs.stop_sequence
-                """,
-                (route_id,),
-            )
-            rows = cur.fetchall()
-            stops = [{"stop_id": r[0], "lat": float(r[1]), "lon": float(r[2])} for r in rows]
-    else:
-        stops = list(stops_in_order)
-
-    total_stops = len(stops)
-    if total_stops < 2:
-        return {"total_stops": total_stops, "route_length_km": 0.0, "avg_stop_spacing": 0.0}
-
-    # Pairwise distances along the ordered stop list
-    dists = []
-    for a, b in zip(stops, stops[1:]):
-        d = _haversine_m(a["lat"], a["lon"], b["lat"], b["lon"])
-        dists.append(d)
-
-    route_length_m = sum(dists)
-    avg_spacing_m = sum(dists) / len(dists) if dists else 0.0
-
-    return {
-        "total_stops": total_stops,
-        "route_length_km": route_length_m / 1000.0,
-        "avg_stop_spacing": avg_spacing_m,
-    }
-
-# --------- optional: PostGIS exact distances (if you want to use it) ---------
-def distance_postgis_m(conn, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Uses ST_DistanceSphere for high-precision spherical distance, if a DB call is acceptable.
+        ShapePolyline instance
     """
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT ST_DistanceSphere(
-                ST_SetSRID(ST_MakePoint(%s, %s), 4326),
-                ST_SetSRID(ST_MakePoint(%s, %s), 4326)
-            )
+            SELECT shape_pt_lat, shape_pt_lon
+            FROM sch_pipeline_shape
+            WHERE shape_id = %s
+            ORDER BY shape_pt_sequence
             """,
-            (lon1, lat1, lon2, lat2),
+            (shape_id,)
         )
-        return float(cur.fetchone()[0])
+        rows = cur.fetchall()
+    
+    if not rows:
+        raise ValueError(f"No shape found for shape_id: {shape_id}")
+    
+    points = [(float(row[0]), float(row[1])) for row in rows]
+    return ShapePolyline(points)
+
+
+def load_shape_for_trip(trip_id: str, conn) -> Optional[ShapePolyline]:
+    """
+    Load shape for a trip, returns None if trip has no shape.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT shape_id
+            FROM sch_pipeline_trip
+            WHERE trip_id = %s
+            """,
+            (trip_id,)
+        )
+        row = cur.fetchone()
+    
+    if not row or not row[0]:
+        return None
+    
+    return load_shape_from_gtfs(row[0], conn)
+
+
+# ==================== Usage Example ====================
+
+def example_usage():
+    """
+    Example showing how to use shape-informed features in practice.
+    """
+    # 1. Load shape once per trip (cache this!)
+    from psycopg2 import connect
+    conn = connect("postgresql://user:pass@localhost/gtfs")
+    
+    shape = load_shape_for_trip("trip_123", conn)
+    
+    # 2. For each vehicle position update
+    vehicle_position = {
+        'lat': 42.3601,
+        'lon': -71.0589,
+        'bearing': 180.0
+    }
+    
+    current_stop = {
+        'stop_id': 'stop_A',
+        'lat': 42.3598,
+        'lon': -71.0592
+    }
+    
+    next_stop = {
+        'stop_id': 'stop_B', 
+        'lat': 42.3620,
+        'lon': -71.0580
+    }
+    
+    # 3. Get shape-informed features
+    features = calculate_distance_features_with_shape(
+        vehicle_position,
+        current_stop,
+        next_stop,
+        shape=shape
+    )
+    
+    print(f"Shape progress: {features['shape_progress']:.2%}")
+    print(f"Distance to stop (along shape): {features['shape_distance_to_stop']:.0f}m")
+    print(f"Cross-track error: {features['cross_track_error']:.1f}m")
+    print(f"Segment progress: {features['progress_on_segment']:.2%}")
+
+if __name__ == "__main__":
+    example_usage()
