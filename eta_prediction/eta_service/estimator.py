@@ -1,6 +1,7 @@
 """
-ETA Service - Enhanced Implementation
-Estimates stop arrival times from vehicle positions with route-specific model support.
+ETA Service - Low-Latency Implementation with Direct Shape Support
+Estimates stop arrival times from vehicle positions with optional pre-loaded shapes.
+No database calls during inference for maximum performance.
 """
 
 import sys
@@ -15,7 +16,42 @@ sys.path.insert(0, str(project_root / "feature_engineering"))
 sys.path.insert(0, str(project_root / "models"))
 
 from feature_engineering.temporal import extract_temporal_features
+
+# Import registry with proper path resolution
+import os
 from models.common.registry import get_registry
+
+
+# Set model registry directory before importing estimator
+MODELS_DIR = project_root / "models" / "trained"
+os.environ['MODEL_REGISTRY_DIR'] = str(MODELS_DIR)
+
+print(f"🔧 Project root: {project_root}")
+print(f"🔧 Model registry: {MODELS_DIR}")
+print(f"🔧 Registry exists: {MODELS_DIR.exists()}")
+
+# Verify registry contents if it exists
+if MODELS_DIR.exists():
+    registry_files = list(MODELS_DIR.glob("*.pkl"))
+    print(f"🔧 Found {len(registry_files)} .pkl model files")
+    if (MODELS_DIR / "registry.json").exists():
+        print(f"🔧 registry.json found ✓")
+    else:
+        print(f"⚠️  registry.json NOT found")
+else:
+    print(f"⚠️  WARNING: Model registry directory does not exist!")
+print()
+
+# Import shape-aware spatial features
+try:
+    from feature_engineering.spatial import (
+        ShapePolyline,
+        calculate_distance_features_with_shape
+    )
+    SHAPE_SUPPORT = True
+except ImportError:
+    SHAPE_SUPPORT = False
+    print("⚠️  Shape-aware spatial features not available, using fallback")
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -31,8 +67,11 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
-def _progress_features(vehicle_position, stop, next_stop, total_segments_hint):
-    """Approximate distance/progress metrics without requiring shapes."""
+def _progress_features_fallback(vehicle_position, stop, next_stop, total_segments_hint):
+    """
+    Fallback: Approximate distance/progress metrics without shapes.
+    Used when shape data is unavailable for low-latency inference.
+    """
     vp_lat = vehicle_position["lat"]
     vp_lon = vehicle_position["lon"]
     stop_lat = stop["lat"]
@@ -45,13 +84,9 @@ def _progress_features(vehicle_position, stop, next_stop, total_segments_hint):
         next_lat = next_stop["lat"]
         next_lon = next_stop["lon"]
         segment_length = haversine_distance(stop_lat, stop_lon, next_lat, next_lon)
-        if segment_length == 0.0:
-            distance_to_next = 0.0
-        else:
+        if segment_length > 0:
             distance_to_next = haversine_distance(vp_lat, vp_lon, next_lat, next_lon)
             progress_on_segment = max(0.0, min(1.0, 1.0 - (distance_to_next / segment_length)))
-    else:
-        distance_to_next = None
 
     stop_seq = (
         stop.get("stop_sequence")
@@ -68,7 +103,38 @@ def _progress_features(vehicle_position, stop, next_stop, total_segments_hint):
     denom = max(float(total_segments), 1.0)
     progress_ratio = max(0.0, min(1.0, (completed + progress_on_segment) / denom))
 
-    return distance_to_stop, progress_on_segment, progress_ratio
+    return {
+        'distance_to_stop_m': distance_to_stop,
+        'progress_on_segment': progress_on_segment,
+        'progress_ratio': progress_ratio,
+        'cross_track_error': None,
+        'shape_progress': None,
+        'shape_distance_to_stop': None
+    }
+
+
+def _progress_features_with_shape(vehicle_position, stop, next_stop, shape, vehicle_stop_order, total_segments):
+    """
+    Shape-aware: Calculate distance/progress using pre-loaded GTFS shape polyline.
+    Returns enhanced spatial features including cross-track error and shape-based distances.
+    """
+    features = calculate_distance_features_with_shape(
+        vehicle_position=vehicle_position,
+        stop=stop,
+        next_stop=next_stop,
+        shape=shape,
+        vehicle_stop_order=vehicle_stop_order,
+        total_segments=total_segments
+    )
+    
+    return {
+        'distance_to_stop_m': features.get('distance_to_stop', 0.0),
+        'progress_on_segment': features.get('progress_on_segment', 0.0),
+        'progress_ratio': features.get('progress_ratio', 0.0),
+        'cross_track_error': features.get('cross_track_error'),
+        'shape_progress': features.get('shape_progress'),
+        'shape_distance_to_stop': features.get('shape_distance_to_stop')
+    }
 
 
 def _predict_with_model(model_key, model_type, features, distance_m):
@@ -120,10 +186,8 @@ def _predict_with_model(model_key, model_type, features, distance_m):
             wind_speed_kmh=features.get('wind_speed_kmh')
         )
 
-    # ✅ NEW XGBOOST BRANCH (consistent with xgb/predict.py)
     elif model_type == 'xgboost':
         from models.xgb.predict import predict_eta
-
         return predict_eta(
             model_key=model_key,
             distance_to_stop=distance_m,
@@ -152,7 +216,30 @@ def estimate_stop_times(
     model_type: str = None,
     prefer_route_model: bool = True,
     max_stops: int = 3,
+    shape: object = None,
 ) -> dict:
+    """
+    Estimate arrival times for upcoming stops based on vehicle position.
+    
+    LOW-LATENCY DESIGN: No database calls during inference!
+    All data (stops, shapes) must be pre-loaded and passed as arguments.
+    
+    Args:
+        vehicle_position: Dict with vehicle_id, route, lat, lon, speed, timestamp
+        upcoming_stops: List of dicts with stop_id, stop_sequence, lat, lon
+        route_id: Optional route override
+        trip_id: Optional trip ID for metadata
+        model_key: Optional explicit model to use
+        model_type: Optional model type filter
+        prefer_route_model: If True, prefer route-specific models over global
+        max_stops: Maximum number of stops to predict
+        shape: Optional pre-loaded ShapePolyline object for shape-aware features.
+               If None, falls back to haversine-based distance calculations.
+               Pass a ShapePolyline instance from the cache for best performance.
+        
+    Returns:
+        Dict with predictions, model info, and metadata
+    """
 
     # Validate inputs
     if not vehicle_position or not upcoming_stops:
@@ -185,6 +272,12 @@ def estimate_stop_times(
     if route_id is None:
         route_id = vehicle_position.get('route', 'unknown')
 
+    # Validate shape if provided
+    shape_available = shape is not None and SHAPE_SUPPORT
+    if shape and not SHAPE_SUPPORT:
+        print("[ETA Service] Shape provided but spatial module unavailable, using fallback")
+        shape = None
+
     # Load registry
     registry = get_registry()
     model_scope = 'unknown'
@@ -202,9 +295,7 @@ def estimate_stop_times(
 
             if model_key:
                 model_scope = 'route'
-                print(f"[ETA Service] Using route-specific model for route {route_id}")
             else:
-                print(f"[ETA Service] No route model for {route_id}. Trying global.")
                 model_key = registry.get_best_model(
                     model_type=model_type,
                     route_id='global',
@@ -257,7 +348,7 @@ def estimate_stop_times(
         }
 
     # ============================================================
-    #    PREDICT STOP ETAs
+    #    PREDICT STOP ETAs (SHAPE-AWARE IF AVAILABLE)
     # ============================================================
     predictions = []
     approx_total_segments = max(
@@ -275,13 +366,6 @@ def estimate_stop_times(
     for idx, stop in enumerate(stops_to_predict):
         next_stop = stops_to_predict[idx + 1] if idx + 1 < len(stops_to_predict) else None
 
-        distance_m, progress_on_segment, progress_ratio = _progress_features(
-            vehicle_position,
-            stop,
-            next_stop,
-            approx_total_segments,
-        )
-
         stop_sequence_value = (
             stop.get('stop_sequence')
             or stop.get('sequence')
@@ -289,7 +373,36 @@ def estimate_stop_times(
             or idx + 1
         )
 
+        # Calculate spatial features (shape-aware if available)
+        if shape_available:
+            spatial_features = _progress_features_with_shape(
+                vehicle_position,
+                stop,
+                next_stop,
+                shape,
+                vehicle_stop_order=stop_sequence_value,
+                total_segments=approx_total_segments
+            )
+        else:
+            spatial_features = _progress_features_fallback(
+                vehicle_position,
+                stop,
+                next_stop,
+                approx_total_segments
+            )
+
+        distance_m = spatial_features['distance_to_stop_m']
+
         # Build features
+        progress_on_segment = spatial_features['progress_on_segment']
+        if progress_on_segment is None:
+            progress_on_segment = 0.0
+
+        progress_ratio = spatial_features['progress_ratio']
+        if progress_ratio is None:
+            # If we truly cannot infer progress, treat as at start of segment
+            progress_ratio = 0.0
+
         features = {
             'route_id': route_id,
             'stop_sequence': stop_sequence_value,
@@ -318,7 +431,7 @@ def estimate_stop_times(
 
             eta_ts = datetime.fromtimestamp(vp_timestamp.timestamp() + eta_seconds, tz=timezone.utc)
 
-            predictions.append({
+            prediction = {
                 'stop_id': stop['stop_id'],
                 'stop_sequence': stop_sequence_value,
                 'distance_to_stop_m': round(distance_m, 1),
@@ -326,7 +439,17 @@ def estimate_stop_times(
                 'eta_minutes': round(eta_minutes, 2),
                 'eta_formatted': eta_formatted,
                 'eta_timestamp': eta_ts.isoformat(),
-            })
+            }
+            
+            # Add shape-based metrics if available
+            if spatial_features.get('cross_track_error') is not None:
+                prediction['cross_track_error_m'] = round(spatial_features['cross_track_error'], 1)
+            if spatial_features.get('shape_progress') is not None:
+                prediction['shape_progress'] = round(spatial_features['shape_progress'], 3)
+            if spatial_features.get('shape_distance_to_stop') is not None:
+                prediction['shape_distance_to_stop_m'] = round(spatial_features['shape_distance_to_stop'], 1)
+            
+            predictions.append(prediction)
 
         except Exception as e:
             predictions.append({
@@ -348,5 +471,6 @@ def estimate_stop_times(
         'model_key': model_key,
         'model_type': actual_model_type,
         'model_scope': model_scope,
+        'shape_used': shape_available,
         'predictions': predictions
     }

@@ -4,11 +4,41 @@ Provides save/load functionality with consistent structure.
 """
 
 import json
+import os
 import pickle
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
 import pandas as pd
+
+
+def _discover_project_root() -> Path:
+    """Try to locate the repository root by walking up for pyproject or .git."""
+    path = Path(__file__).resolve()
+    for parent in [path.parent, *path.parents]:
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return parent
+    # Fallback to historical assumption (two levels up)
+    return path.parents[2]
+
+
+PROJECT_ROOT = _discover_project_root()
+DEFAULT_REGISTRY_DIR = PROJECT_ROOT / "models" / "trained"
+
+
+def _find_existing_registry_dir() -> Path:
+    """
+    Search upwards from the current working directory for an existing registry.
+    This allows running tools from nested folders (e.g., bytewax/) while still
+    reusing the canonical models/trained directory at the project root.
+    """
+    cwd = Path.cwd().resolve()
+    search_roots = [cwd] + list(cwd.parents)
+    for root in search_roots:
+        candidate = root / "models" / "trained"
+        if (candidate / "registry.json").exists():
+            return candidate.resolve()
+    return DEFAULT_REGISTRY_DIR.resolve()
 
 
 class ModelRegistry:
@@ -23,14 +53,26 @@ class ModelRegistry:
         └── registry.json              # Index of all models
     """
     
-    def __init__(self, base_dir: str = "models/trained"):
+    def __init__(self, base_dir: Union[str, Path, None] = None):
         """
         Initialize registry.
         
         Args:
             base_dir: Base directory for model storage
         """
-        self.base_dir = Path(base_dir)
+        env_dir = os.getenv("MODEL_REGISTRY_DIR")
+        configured_dir = base_dir if base_dir is not None else env_dir
+
+        if configured_dir is not None:
+            base_path = Path(configured_dir).expanduser()
+            if not base_path.is_absolute():
+                base_path = (PROJECT_ROOT / base_path).resolve()
+            else:
+                base_path = base_path.resolve()
+        else:
+            base_path = _find_existing_registry_dir()
+
+        self.base_dir = base_path
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
         self.registry_file = self.base_dir / "registry.json"
@@ -79,7 +121,10 @@ class ModelRegistry:
         # Enrich metadata
         metadata['model_key'] = model_key
         metadata['saved_at'] = datetime.now().isoformat()
-        metadata['model_path'] = str(model_path)
+        # Store registry paths relative to repo root for portability
+        relative_model_path = os.path.relpath(model_path, PROJECT_ROOT)
+        relative_meta_path = os.path.relpath(meta_path, PROJECT_ROOT)
+        metadata['model_path'] = relative_model_path
         
         # Save metadata
         with open(meta_path, 'w') as f:
@@ -87,8 +132,8 @@ class ModelRegistry:
         
         # Update registry
         self.registry[model_key] = {
-            'model_path': str(model_path),
-            'meta_path': str(meta_path),
+            'model_path': relative_model_path,
+            'meta_path': relative_meta_path,
             'saved_at': metadata['saved_at'],
             'model_type': metadata.get('model_type', 'unknown'),
             'route_id': metadata.get('route_id'),  # Track route scope
@@ -114,6 +159,8 @@ class ModelRegistry:
             raise KeyError(f"Model {model_key} not found in registry")
         
         model_path = Path(self.registry[model_key]['model_path'])
+        if not model_path.is_absolute():
+            model_path = (PROJECT_ROOT / model_path).resolve()
         
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
@@ -134,6 +181,8 @@ class ModelRegistry:
             raise KeyError(f"Model {model_key} not found in registry")
         
         meta_path = Path(self.registry[model_key]['meta_path'])
+        if not meta_path.is_absolute():
+            meta_path = (PROJECT_ROOT / meta_path).resolve()
         
         with open(meta_path, 'r') as f:
             metadata = json.load(f)
