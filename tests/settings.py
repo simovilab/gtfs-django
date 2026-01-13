@@ -1,7 +1,20 @@
 import os
+import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+# =============================
+# Path configuration
+# =============================
+
+# Go up one level to reach the project root (gtfs-django/)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Add the project root to Python's import path
+sys.path.insert(0, str(BASE_DIR))
+
+# =============================
+# Basic Django settings
+# =============================
 
 SECRET_KEY = "test-secret-key"
 DEBUG = True
@@ -9,6 +22,10 @@ ALLOWED_HOSTS = ["*"]
 
 USE_TZ = True
 TIME_ZONE = "UTC"
+
+# =============================
+# Installed apps
+# =============================
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -19,8 +36,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Enable GeoDjango if requested (default off to avoid system deps for unit tests)
     *(["django.contrib.gis"] if os.getenv("USE_GIS", "0") == "1" else []),
-    "gtfs",
+    "gtfs",  # Main GTFS app
 ]
+
+# =============================
+# Middleware
+# =============================
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -31,7 +52,15 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
+# =============================
+# URL configuration
+# =============================
+
 ROOT_URLCONF = "tests.urls"
+
+# =============================
+# Templates
+# =============================
 
 TEMPLATES = [
     {
@@ -49,12 +78,20 @@ TEMPLATES = [
     }
 ]
 
+# =============================
+# Static files
+# =============================
+
 STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Database: default to SQLite for unit tests; allow GIS backends via env
+# =============================
+# Database configuration
+# =============================
+
+# Default: SQLite for unit tests
+# Optional: enable PostGIS via USE_GIS=1
 if os.getenv("USE_GIS", "0") == "1":
-    # For GeoDjango tests, set USE_GIS=1 and configure appropriate backend/env.
     DATABASES = {
         "default": {
             "ENGINE": os.getenv(
