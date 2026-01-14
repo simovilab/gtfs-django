@@ -1,0 +1,175 @@
+[
+  {
+    "model": "gtfs.agencyschedule",
+    "pk": "A1",
+    "fields": {
+      "agency_name": "Demo Transit",
+      "agency_url": "https://demo.example",
+      "agency_timezone": "UTC",
+      "agency_phone": "000-000",
+      "agency_email": "info@demo.example"
+    }
+  },
+  {
+    "model": "gtfs.calendarschedule",
+    "pk": "WKDY",
+    "fields": {
+      "monday": 1,
+      "tuesday": 1,
+      "wednesday": 1,
+      "thursday": 1,
+      "friday": 1,
+      "saturday": 0,
+      "sunday": 0,
+      "start_date": "2025-01-01",
+      "end_date": "2025-12-31"
+    }
+  },
+  {
+    "model": "gtfs.calendardateschedule",
+    "pk": null,
+    "fields": {
+      "service": "WKDY",
+      "date": "2025-05-01",
+      "exception_type": 1
+    }
+  },
+  {
+    "model": "gtfs.routeschedule",
+    "pk": "R10",
+    "fields": {
+      "agency": "A1",
+      "route_short_name": "10",
+      "route_long_name": "Central Line",
+      "route_desc": "Main corridor",
+      "route_type": 3,
+      "route_color": "0044AA",
+      "route_text_color": "FFFFFF"
+    }
+  },
+  {
+    "model": "gtfs.shapeschedule",
+    "pk": 1,
+    "fields": {
+      "shape_id": "S1",
+      "shape_pt_lat": 9.93,
+      "shape_pt_lon": -84.08,
+      "shape_pt_sequence": 1,
+      "shape_dist_traveled": 0.0
+    }
+  },
+  {
+    "model": "gtfs.shapeschedule",
+    "pk": 2,
+    "fields": {
+      "shape_id": "S1",
+      "shape_pt_lat": 9.94,
+      "shape_pt_lon": -84.07,
+      "shape_pt_sequence": 2,
+      "shape_dist_traveled": 1.0
+    }
+  },
+  {
+    "model": "gtfs.shapeschedule",
+    "pk": 3,
+    "fields": {
+      "shape_id": "S1",
+      "shape_pt_lat": 9.95,
+      "shape_pt_lon": -84.06,
+      "shape_pt_sequence": 3,
+      "shape_dist_traveled": 2.0
+    }
+  },
+  {
+    "model": "gtfs.stopschedule",
+    "pk": "ST1",
+    "fields": {
+      "stop_code": "ST1",
+      "stop_name": "Central Station",
+      "stop_desc": "",
+      "stop_lat": 9.93,
+      "stop_lon": -84.08,
+      "zone_id": "",
+      "location_type": 0,
+      "parent_station": null,
+      "stop_timezone": "",
+      "wheelchair_boarding": 0
+    }
+  },
+  {
+    "model": "gtfs.stopschedule",
+    "pk": "ST2",
+    "fields": {
+      "stop_code": "ST2",
+      "stop_name": "North Park",
+      "stop_desc": "",
+      "stop_lat": 9.95,
+      "stop_lon": -84.06,
+      "zone_id": "",
+      "location_type": 0,
+      "parent_station": null,
+      "stop_timezone": "",
+      "wheelchair_boarding": 0
+    }
+  },
+  {
+    "model": "gtfs.tripschedule",
+    "pk": "T100",
+    "fields": {
+      "route": "R10",
+      "service": "WKDY",
+      "trip_headsign": "Northbound",
+      "trip_short_name": "NB-10",
+      "direction_id": 0,
+      "block_id": "",
+      "shape": null,
+      "wheelchair_accessible": 1
+    }
+  },
+  {
+    "model": "gtfs.stoptimeschedule",
+    "pk": null,
+    "fields": {
+      "trip": "T100",
+      "stop": "ST1",
+      "stop_sequence": 1,
+      "arrival_time": "08:00:00",
+      "departure_time": "08:00:00",
+      "stop_headsign": "",
+      "pickup_type": 0,
+      "drop_off_type": 0,
+      "shape_dist_traveled": 0.0,
+      "timepoint": 1
+    }
+  },
+  {
+    "model": "gtfs.stoptimeschedule",
+    "pk": null,
+    "fields": {
+      "trip": "T100",
+      "stop": "ST2",
+      "stop_sequence": 2,
+      "arrival_time": "08:10:00",
+      "departure_time": "08:10:00",
+      "stop_headsign": "",
+      "pickup_type": 0,
+      "drop_off_type": 0,
+      "shape_dist_traveled": 1.0,
+      "timepoint": 1
+    }
+  },
+  {
+    "model": "gtfs.feedinfoschedule",
+    "pk": null,
+    "fields": {
+      "feed_publisher_name": "SIMOVILab",
+      "feed_publisher_url": "https://simovilab.org",
+      "feed_lang": "en",
+      "feed_version": "0.1.0",
+      "feed_start_date": "2025-01-01",
+      "feed_end_date": "2025-12-31",
+      "feed_contact_email": "admin@simovilab.org",
+      "feed_contact_url": "https://simovilab.org/contact"
+    }
+  }
+]
