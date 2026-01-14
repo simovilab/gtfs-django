@@ -1,7 +1,11 @@
 import os
+import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+# =========================================
+# BASE SETTINGS
+# =========================================
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "test-secret-key"
 DEBUG = True
@@ -10,6 +14,10 @@ ALLOWED_HOSTS = ["*"]
 USE_TZ = True
 TIME_ZONE = "UTC"
 
+# =========================================
+# APPLICATIONS
+# =========================================
+# Carga condicional: sin GeoDjango en modo test
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -17,11 +25,14 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Enable GeoDjango if requested (default off to avoid system deps for unit tests)
-    *(["django.contrib.gis"] if os.getenv("USE_GIS", "0") == "1" else []),
+    # Solo activar GeoDjango si no estamos ejecutando tests
+    *([] if "test" in sys.argv else ["django.contrib.gis"]),
     "gtfs",
 ]
 
+# =========================================
+# MIDDLEWARE
+# =========================================
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -31,6 +42,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
+# =========================================
+# URLS / TEMPLATES
+# =========================================
 ROOT_URLCONF = "tests.urls"
 
 TEMPLATES = [
@@ -46,32 +60,49 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
             ],
         },
-    }
+    },
 ]
 
 STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Database: default to SQLite for unit tests; allow GIS backends via env
-if os.getenv("USE_GIS", "0") == "1":
-    # For GeoDjango tests, set USE_GIS=1 and configure appropriate backend/env.
-    DATABASES = {
-        "default": {
-            "ENGINE": os.getenv(
-                "DJANGO_DB_ENGINE",
-                "django.contrib.gis.db.backends.postgis",
-            ),
-            "NAME": os.getenv("POSTGRES_DB", "gtfs_test"),
-            "USER": os.getenv("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "postgres"),
-            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-            "PORT": int(os.getenv("POSTGRES_PORT", "5432")),
-        }
-    }
-else:
+# =========================================
+# DATABASE CONFIGURATION
+# =========================================
+if "test" in sys.argv:
+    # -------------------------
+    # Use in-memory SQLite for tests
+    # -------------------------
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+            "NAME": ":memory:",
         }
     }
+else:
+    # -------------------------
+    # Default: PostGIS (for dev/prod)
+    # -------------------------
+    if os.getenv("USE_GIS", "1") == "1":
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.contrib.gis.db.backends.postgis",
+                "NAME": "gtfs_test",
+                "USER": "gepacam",
+                "PASSWORD": "gepacam",
+                "HOST": "localhost",
+                "PORT": "5432",
+            }
+        }
+    else:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+            }
+        }
+
+# =========================================
+# SPATIALITE (solo necesario si se usa SQLite + GIS)
+# =========================================
+SPATIALITE_LIBRARY_PATH = "mod_spatialite"
