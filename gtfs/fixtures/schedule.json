@@ -1,0 +1,201 @@
+{
+    "entities": {
+        "agency": {
+            "primary_key": "agency_id",
+            "fields": {
+                "agency_id": "string",
+                "agency_name": "string",
+                "agency_url": "string",
+                "agency_timezone": "string",
+                "agency_lang": "string",
+                "agency_phone": "string",
+                "agency_email": "string"
+            },
+            "constraints": {
+                "agency_timezone": "IANA timezone string",
+                "agency_lang": "ISO 639-1 code",
+                "agency_url": "http/https URL"
+            }
+        },
+        "routes": {
+            "primary_key": "route_id",
+            "fields": {
+                "route_id": "string",
+                "agency_id": "string",
+                "route_short_name": "string",
+                "route_long_name": "string",
+                "route_desc": "string",
+                "route_type": "integer",
+                "route_color": "string",
+                "route_text_color": "string"
+            },
+            "foreign_keys": {
+                "agency_id": "agency.agency_id"
+            },
+            "constraints": {
+                "route_type": "enum {0-7, 11, ...}",
+                "route_color": "hex RGB",
+                "route_text_color": "hex RGB"
+            }
+        },
+        "trips": {
+            "primary_key": "trip_id",
+            "fields": {
+                "trip_id": "string",
+                "route_id": "string",
+                "service_id": "string",
+                "trip_headsign": "string",
+                "trip_short_name": "string",
+                "direction_id": "integer",
+                "block_id": "string",
+                "shape_id": "string",
+                "wheelchair_accessible": "integer"
+            },
+            "foreign_keys": {
+                "route_id": "routes.route_id",
+                "service_id": "calendar.service_id",
+                "shape_id": "shapes.shape_id"
+            },
+            "constraints": {
+                "direction_id": "enum {0,1}",
+                "wheelchair_accessible": "enum {0=unknown,1=accessible,2=not accessible}"
+            }
+        },
+        "stops": {
+            "primary_key": "stop_id",
+            "fields": {
+                "stop_id": "string",
+                "stop_code": "string",
+                "stop_name": "string",
+                "stop_desc": "string",
+                "stop_lat": "float",
+                "stop_lon": "float",
+                "zone_id": "string",
+                "location_type": "integer",
+                "parent_station": "string",
+                "stop_timezone": "string",
+                "wheelchair_boarding": "integer"
+            },
+            "foreign_keys": {
+                "parent_station": "stops.stop_id"
+            },
+            "constraints": {
+                "stop_lat": "-90 ≤ value ≤ 90",
+                "stop_lon": "-180 ≤ value ≤ 180",
+                "location_type": "enum {0=Stop,1=Station,2=Entrance,...}",
+                "wheelchair_boarding": "enum {0=unknown,1=accessible,2=not accessible}"
+            }
+        },
+        "stop_times": {
+            "primary_key": [
+                "trip_id",
+                "stop_sequence"
+            ],
+            "fields": {
+                "trip_id": "string",
+                "arrival_time": "time",
+                "departure_time": "time",
+                "stop_id": "string",
+                "stop_sequence": "integer",
+                "stop_headsign": "string",
+                "pickup_type": "integer",
+                "drop_off_type": "integer",
+                "shape_dist_traveled": "float",
+                "timepoint": "integer"
+            },
+            "foreign_keys": {
+                "trip_id": "trips.trip_id",
+                "stop_id": "stops.stop_id"
+            },
+            "constraints": {
+                "arrival_time": "HH:MM:SS (can exceed 24h)",
+                "departure_time": "HH:MM:SS (can exceed 24h)",
+                "pickup_type": "enum {0,1,2,3}",
+                "drop_off_type": "enum {0,1,2,3}"
+            }
+        },
+        "calendar": {
+            "primary_key": "service_id",
+            "fields": {
+                "service_id": "string",
+                "monday": "integer",
+                "tuesday": "integer",
+                "wednesday": "integer",
+                "thursday": "integer",
+                "friday": "integer",
+                "saturday": "integer",
+                "sunday": "integer",
+                "start_date": "date",
+                "end_date": "date"
+            },
+            "constraints": {
+                "monday": "enum {0=no service,1=service runs}",
+                "tuesday": "enum {0=no service,1=service runs}",
+                "wednesday": "enum {0=no service,1=service runs}",
+                "thursday": "enum {0=no service,1=service runs}",
+                "friday": "enum {0=no service,1=service runs}",
+                "saturday": "enum {0=no service,1=service runs}",
+                "sunday": "enum {0=no service,1=service runs}",
+                "start_date": "YYYYMMDD",
+                "end_date": "YYYYMMDD (≥ start_date)"
+            }
+        },
+        "calendar_dates": {
+            "primary_key": [
+                "service_id",
+                "date"
+            ],
+            "fields": {
+                "service_id": "string",
+                "date": "date",
+                "exception_type": "integer"
+            },
+            "foreign_keys": {
+                "service_id": "calendar.service_id"
+            },
+            "constraints": {
+                "date": "YYYYMMDD",
+                "exception_type": "enum {1=service added,2=service removed}"
+            }
+        },
+        "shapes": {
+            "primary_key": [
+                "shape_id",
+                "shape_pt_sequence"
+            ],
+            "fields": {
+                "shape_id": "string",
+                "shape_pt_lat": "float",
+                "shape_pt_lon": "float",
+                "shape_pt_sequence": "integer",
+                "shape_dist_traveled": "float"
+            },
+            "constraints": {
+                "shape_pt_lat": "-90 ≤ value ≤ 90",
+                "shape_pt_lon": "-180 ≤ value ≤ 180",
+                "shape_pt_sequence": "integer ≥ 0",
+                "shape_dist_traveled": "float ≥ 0"
+            }
+        },
+        "feed_info": {
+            "fields": {
+                "feed_publisher_name": "string",
+                "feed_publisher_url": "string",
+                "feed_lang": "string",
+                "feed_version": "string",
+                "feed_start_date": "date",
+                "feed_end_date": "date",
+                "feed_contact_email": "string",
+                "feed_contact_url": "string"
+            },
+            "constraints": {
+                "feed_lang": "ISO 639-1 code",
+                "feed_publisher_url": "http/https URL",
+                "feed_contact_email": "valid email",
+                "feed_contact_url": "http/https URL"
+            }
+        }
+    },
+    "version": "1.0.0",
+    "spec": "GTFS Schedule v2.0"
+}

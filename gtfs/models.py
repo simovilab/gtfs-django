@@ -1,4 +1,9 @@
 # Add your models here
+
+
+
+
+
 # from django.contrib.gis.db import models  # Use GeoDjango models when needed
 
 import re
@@ -85,12 +90,10 @@ class Feed(models.Model):
     def __str__(self):
         return self.feed_id
 
-
 class Agency(models.Model):
     """One or more transit agencies that provide the data in this feed.
     Maps to agency.txt in the GTFS feed.
     """
-
     id = models.BigAutoField(primary_key=True)
     feed = models.ForeignKey(Feed, to_field="feed_id", on_delete=models.CASCADE)
     agency_id = models.CharField(
@@ -1086,3 +1089,10 @@ class Alert(models.Model):
 
     def __str__(self):
         return self.alert_id
+
+
+
+# ─────────────────────────────
+# Added for subissue #4 - Migrate to composite PK (Django 5.2)
+# ─────────────────────────────
+from .models_schedule import *
