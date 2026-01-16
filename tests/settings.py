@@ -18,8 +18,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Enable GeoDjango if requested (default off to avoid system deps for unit tests)
-    *(["django.contrib.gis"] if os.getenv("USE_GIS", "0") == "1" else []),
+    #*(["django.contrib.gis"] if os.getenv("USE_GIS", "0") == "1" else []),
     "gtfs",
+    "drf_spectacular",
+    "rest_framework",
 ]
 
 MIDDLEWARE = [
@@ -48,7 +50,9 @@ TEMPLATES = [
         },
     }
 ]
-
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
 STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
