@@ -4,6 +4,7 @@ Provides save/load functionality with consistent structure.
 """
 
 import json
+import os
 import pickle
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -23,14 +24,15 @@ class ModelRegistry:
         └── registry.json              # Index of all models
     """
     
-    def __init__(self, base_dir: str = "models/trained"):
+    def __init__(self, base_dir: Optional[str] = None):
         """
         Initialize registry.
         
         Args:
             base_dir: Base directory for model storage
         """
-        self.base_dir = Path(base_dir)
+        resolved_base = base_dir or os.getenv("MODEL_REGISTRY_DIR") or "models/trained"
+        self.base_dir = Path(resolved_base).expanduser().resolve()
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
         self.registry_file = self.base_dir / "registry.json"
@@ -114,6 +116,8 @@ class ModelRegistry:
             raise KeyError(f"Model {model_key} not found in registry")
         
         model_path = Path(self.registry[model_key]['model_path'])
+        if not model_path.is_absolute():
+            model_path = self.base_dir / model_path.name
         
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
@@ -134,6 +138,8 @@ class ModelRegistry:
             raise KeyError(f"Model {model_key} not found in registry")
         
         meta_path = Path(self.registry[model_key]['meta_path'])
+        if not meta_path.is_absolute():
+            meta_path = self.base_dir / meta_path.name
         
         with open(meta_path, 'r') as f:
             metadata = json.load(f)
