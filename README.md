@@ -226,3 +226,166 @@ Developed by [Simovi Lab](https://github.com/simovilab) for processing and manag
 ---
 
 For more information about GTFS, visit the [General Transit Feed Specification](https://gtfs.org/) website.
+
+
+
+---
+
+## Reproducible Sample Data
+
+This module includes **small, deterministic GTFS-Realtime fixtures** for testing and documentation purposes.  
+They allow developers to run the system and its unit tests without relying on live MBTA feeds or external network calls.
+
+These fixtures capture a **minimal snapshot of TripUpdate, VehiclePosition, and Alert entities**, and can be regenerated at any time from the local database.
+
+---
+
+### Fixture Location
+
+The reproducible sample data is stored under:
+
+gtfs/fixtures/
+
+├── trip_update_fixture.json
+
+├── vehicle_position_fixture.json
+
+└── alert_fixture.json
+
+
+Each file contains a few representative rows from the respective realtime tables, exported as JSON.
+
+---
+
+###  Regeneration Script
+
+Fixtures can be rebuilt at any time using the script:
+
+```bash
+python -m gtfs.scripts.regenerate_fixtures
+```
+---
+
+##  Running the Realtime Streamer (MBTA)
+
+After installation, no additional database configuration is required — the project uses **SQLite** by default for testing and development.  
+Once dependencies are installed and migrations have run, you can start streaming live data directly from the MBTA GTFS-Realtime feeds.
+
+Run the following command from the project root:
+
+```bash
+python -m gtfs.scripts.stream_mbta_feeds
+```
+
+---
+
+## Minimal Producers & Consumers (GTFS-Realtime)
+
+This section documents the minimal producer and consumer patterns already implemented for GTFS-Realtime, based on:
+
+- `tests/test_realtime.py`
+- `gtfs/scripts/stream_mbta_feeds.py`
+- `gtfs/scripts/regenerate_fixtures.py`
+
+### Producer (Serialization Example)
+
+The project already includes minimal producer patterns in `tests/test_realtime.py` and in the fixture generator `regenerate_fixtures.py`.  
+The following snippet, taken directly from the serialization test, shows how a `FeedMessage` is built and converted into a Protobuf binary:
+
+```python
+feed = gtfs_realtime_pb2.FeedMessage()
+self._add_header(feed)
+
+entity = feed.entity.add(id="test_entity_1")
+trip_update = entity.trip_update
+trip_update.trip.trip_id = self.test_data["trip_id"]
+trip_update.trip.route_id = self.test_data["route_id"]
+
+stop_time = trip_update.stop_time_update.add()
+stop_time.stop_sequence = 1
+stop_time.arrival.delay = 60
+
+serialized = feed.SerializeToString()
+```
+
+A deterministic producer is also used when regenerating fixtures:
+`realtime.build_trip_updates_bytewax()`
+
+This function internally constructs a reproducible TripUpdates feed and writes both JSON and `.pb` files.
+
+
+### Consumer (Parsing Example)
+
+The project also includes minimal consumer patterns that read GTFS-Realtime Protobuf messages and parse them into `FeedMessage` objects.
+
+A typical consumer is shown in `stream_mbta_feeds.py`, where the MBTA feeds are fetched and parsed:
+
+```python
+response = requests.get(url, timeout=20)
+response.raise_for_status()
+
+feed = gtfs_realtime_pb2.FeedMessage()
+feed.ParseFromString(response.content)
+```
+
+The unit tests also demonstrate how a local `.pb` file is parsed:
+
+```python
+feed = gtfs_rt.FeedMessage()
+feed.ParseFromString(content)
+```
+
+Both patterns match the recommended way of decoding GTFS-Realtime messages:
+load the binary, call `ParseFromString()`, and then iterate over feed.entity.
+
+### Error Handling Patterns
+
+The existing modules already include simple and practical error-handling patterns for GTFS-Realtime processing.  
+These patterns can be reused by developers who implement their own producers or consumers.
+
+#### Network and fetch validation (`stream_mbta_feeds.py`)
+```python
+response = requests.get(url, timeout=20)
+response.raise_for_status()
+```
+
+If the feed cannot be retrieved, the fetcher logs the error and skips processing:
+```python
+except Exception as e:
+    print(f"[ERROR] Failed to fetch {url}: {e}")
+    return None
+```
+
+#### Protobuf parsing
+
+Both the streamer and the tests rely on `ParseFromString()`:
+```python
+feed = gtfs_realtime_pb2.FeedMessage()
+feed.ParseFromString(response.content)
+```
+If the binary is corrupted, Protobuf will raise a decoding error.
+
+#### Structural validation (test_realtime.py)
+
+```python
+if not feed.header.gtfs_realtime_version:
+    return False
+if not feed.entity:
+    return False
+```
+
+These checks ensure the feed includes the required GTFS-Realtime fields before being processed.
+
+### References
+
+- GTFS-Realtime Specification  
+  https://gtfs.org/realtime/reference/
+
+- Google Protocol Buffers  
+  https://developers.google.com/protocol-buffers
+
+- SimoviLab Contribution Guidelines  
+  https://github.com/simovilab/.github/blob/main/CONTRIBUTING.md
+
+- Bytewax (stream processing engine used for deterministic TripUpdates)  
+https://docs.bytewax.io/stable/guide/index.html

@@ -1,0 +1,48 @@
+{
+  "header": {
+    "gtfs_realtime_version": "2.0",
+    "incrementality": "FULL_DATASET",
+    "timestamp": 1763932780
+  },
+  "entity": [
+    {
+      "id": "trip_FAKE_TRIP_001",
+      "trip_update": {
+        "timestamp": 1763932780,
+        "trip": {
+          "trip_id": "FAKE_TRIP_001",
+          "route_id": "FAKE_ROUTE_1",
+          "direction_id": 0,
+          "start_time": "21:19:40",
+          "start_date": "20251123",
+          "schedule_relationship": "SCHEDULED"
+        },
+        "vehicle": {
+          "id": "V001",
+          "label": "Test Vehicle",
+          "license_plate": "TEST123"
+        },
+        "stop_time_update": [
+          {
+            "stop_id": "STOP_A",
+            "arrival": {
+              "time": 1763932949
+            }
+          },
+          {
+            "stop_id": "STOP_B",
+            "arrival": {
+              "time": 1763932870
+            }
+          },
+          {
+            "stop_id": "STOP_C",
+            "arrival": {
+              "time": 1763932995
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
