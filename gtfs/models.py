@@ -6,6 +6,7 @@ from django.db.models import UniqueConstraint
 from django.core.exceptions import ValidationError
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Point
+from django.db.models import Q, F
 
 
 def validate_no_spaces_or_special_symbols(value):
@@ -851,11 +852,50 @@ class FeedMessage(models.Model):
 
     class Meta:
         ordering = ["-timestamp"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["feed_message_id", "timestamp"],
+                name="unique_feedmessage_timestamp"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["timestamp", "entity_type"]),
+            models.Index(fields=["provider_id", "timestamp"]),
+        ]
+
+    def clean(self):
+        """Model-level validation for timestamp monotonicity and ID consistency."""
+        # Timestamp monotonicity
+        previous = (
+            FeedMessage.objects.filter(feed_message_id=self.feed_message_id)
+            .exclude(pk=self.pk)
+            .order_by('-timestamp')
+            .first()
+        )
+        if previous and previous.timestamp >= self.timestamp:
+            raise ValidationError(
+                {"timestamp": "Timestamp must be greater than previous FeedMessage timestamp."}
+            )
+
+        # Identifier consistency
+        if self.entity_type == "trip_update" and not hasattr(self, "trip"):
+            raise ValidationError(
+                {"entity_type": "TripUpdate must have a valid trip reference."}
+            )
+
+    def to_json(self):
+        """Converts this model instance into a JSON-serializable dictionary."""
+        return {
+            "feed_message_id": self.feed_message_id,
+            "timestamp": self.timestamp.isoformat(),
+            "entity_type": self.entity_type,
+            "incrementality": self.incrementality,
+            "gtfs_realtime_version": self.gtfs_realtime_version,
+        }
 
     def __str__(self):
         return f"{self.entity_type} ({self.timestamp})"
-
-
+    
 class TripUpdate(models.Model):
     """
     GTFS Realtime TripUpdate entity v2.0 (normalized).
@@ -892,6 +932,23 @@ class TripUpdate(models.Model):
 
     # Delay (int32)
     delay = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["entity_id", "feed_message"],
+                name="unique_tripupdate_per_feed"
+            ),
+            models.CheckConstraint(
+                check=Q(delay__gte=-86400),  # -24 hours in seconds
+                name="valid_delay_range"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["trip_trip_id", "timestamp"]),
+            models.Index(fields=["vehicle_id", "timestamp"]),
+            models.Index(fields=["delay", "timestamp"]),
+        ]
 
     def __str__(self):
         return f"{self.entity_id} ({self.feed_message})"
@@ -930,9 +987,21 @@ class StopTimeUpdate(models.Model):
     # ScheduleRelationship (enum)
     schedule_relationship = models.CharField(max_length=255, blank=True, null=True)
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=Q(arrival_time__lte=F("departure_time")),
+                name="valid_time_order"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["stop_id", "arrival_time"]),
+            models.Index(fields=["stop_id", "departure_time"]),
+            models.Index(fields=["stop_sequence", "trip_update_id"]),
+        ]
+
     def __str__(self):
         return f"{self.stop_id} ({self.trip_update})"
-
 
 class VehiclePosition(models.Model):
     """
@@ -1000,30 +1069,69 @@ class VehiclePosition(models.Model):
 
     # CarriageDetails (message): not implemented
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["entity_id", "feed_message"],
+                name="unique_vehicleposition_per_feed"
+            ),
+            models.CheckConstraint(
+                check=Q(vehicle_occupancy_percentage__gte=0) &
+                      Q(vehicle_occupancy_percentage__lte=100),
+                name="valid_occupancy"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["vehicle_trip_route_id", "vehicle_timestamp"]),
+            models.Index(fields=["vehicle_current_stop_sequence", "vehicle_timestamp"]),
+            models.Index(fields=["vehicle_position_point"]),
+        ]
+
     def save(self, *args, **kwargs):
-        self.vehicle_position_point = Point(
-            self.vehicle_position_longitude, self.vehicle_position_latitude
-        )
-        super(VehiclePosition, self).save(*args, **kwargs)
+        if self.vehicle_position_longitude and self.vehicle_position_latitude:
+            self.vehicle_position_point = Point(
+                self.vehicle_position_longitude, self.vehicle_position_latitude
+            )
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.entity_id} ({self.feed_message})"
 
 
 class Alert(models.Model):
-    """Alerts and warnings about the service.
-    Maps to alerts.txt in the GTFS feed.
-
-    TODO: ajustar con Alerts de GTFS Realtime
+    """
+    GTFS Realtime Alert entity (v2.0)
+    Combines GTFS static alerts.txt with Realtime alerts feed.
     """
 
     id = models.BigAutoField(primary_key=True)
+
+    # Relation to Feed model
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+
+    # ID alert
     alert_id = models.CharField(
-        max_length=255, help_text="Identificador único de la alerta."
+        max_length=255,
+        help_text="Identificador único de la alerta (según FeedMessage.entity.id)."
     )
-    route_id = models.CharField(max_length=255, help_text="Identificador de la ruta.")
-    trip_id = models.CharField(max_length=255, help_text="Identificador del viaje.")
+
+    # Relation with schedule entities (Realtime 'informed_entity')
+    route = models.ForeignKey(
+        Route,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Ruta afectada por la alerta."
+    )
+    trip = models.ForeignKey(
+        Trip,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Viaje afectado por la alerta."
+    )
+
+    # Fields for temporal validity (Realtime 'active_period')
     service_date = models.DateField(
         help_text="Fecha del servicio descrito por la alerta."
     )
@@ -1033,11 +1141,13 @@ class Alert(models.Model):
     service_end_time = models.TimeField(
         help_text="Hora de finalización del servicio descrito por la alerta."
     )
-    alert_header = models.CharField(
-        max_length=255, help_text="Encabezado de la alerta."
-    )
-    alert_description = models.TextField(help_text="Descripción de la alerta.")
-    alert_url = models.URLField(blank=True, null=True, help_text="URL de la alerta.")
+
+    # Description (Realtime 'header_text', 'description_text', 'url')
+    alert_header = models.CharField(max_length=255, help_text="Encabezado de la alerta.")
+    alert_description = models.TextField(help_text="Descripción detallada de la alerta.")
+    alert_url = models.URLField(blank=True, null=True, help_text="URL con más información sobre la alerta.")
+
+    # Fields for classification (Realtime 'cause' and 'effect')
     cause = models.PositiveIntegerField(
         choices=(
             (1, "Otra causa"),
@@ -1051,7 +1161,7 @@ class Alert(models.Model):
             (9, "Demora"),
             (10, "Cierre"),
         ),
-        help_text="Causa de la alerta.",
+        help_text="Causa de la alerta según GTFS Realtime."
     )
     effect = models.PositiveIntegerField(
         choices=(
@@ -1064,7 +1174,7 @@ class Alert(models.Model):
             (7, "Detención"),
             (8, "Desconocido"),
         ),
-        help_text="Efecto de la alerta.",
+        help_text="Efecto de la alerta sobre el servicio."
     )
     severity = models.PositiveIntegerField(
         choices=(
@@ -1074,15 +1184,32 @@ class Alert(models.Model):
             (4, "Grave"),
             (5, "Muy grave"),
         ),
-        help_text="Severidad de la alerta.",
+        help_text="Severidad de la alerta."
     )
-    published = models.DateTimeField(
-        help_text="Fecha y hora de publicación de la alerta."
+
+    # Data in realtime feed
+    published = models.DateTimeField(help_text="Fecha y hora de publicación de la alerta.")
+    updated = models.DateTimeField(help_text="Fecha y hora de actualización de la alerta.")
+
+    # Form entities (Realtime 'informed_entity' como JSON)
+    informed_entity = models.JSONField(
+        help_text="Entidades afectadas (rutas, viajes, paradas, etc.) según el feed Realtime."
     )
-    updated = models.DateTimeField(
-        help_text="Fecha y hora de actualización de la alerta."
-    )
-    informed_entity = models.JSONField(help_text="Entidades informadas por la alerta.")
+
+    class Meta:
+        verbose_name = "Alerta del servicio (GTFS Realtime)"
+        verbose_name_plural = "Alertas del servicio (GTFS Realtime)"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["alert_id", "feed"],
+                name="unique_alert_per_feed"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["route_id"]),
+            models.Index(fields=["trip_id"]),
+            models.Index(fields=["service_date"]),
+        ]
 
     def __str__(self):
-        return self.alert_id
+        return f"{self.alert_id} ({self.route or 'sin ruta'})"

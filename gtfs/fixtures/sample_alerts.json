@@ -1,0 +1,10 @@
+[
+  {
+    "alert_id": "A001",
+    "route_id": "R01",
+    "header_text": "Service interruption on R01",
+    "description_text": "Maintenance from 14:00 to 18:00",
+    "severity": "moderate",
+    "timestamp": 1762132640
+  }
+]
