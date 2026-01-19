@@ -1,0 +1,17 @@
+[project]
+name = "prefect-eta-runtime"
+version = "0.1.0"
+description = "Prefect flow that reads vehicle positions from Redis, runs ETA predictions, and writes them back to Redis."
+authors = [{ name = "bUCR" }]
+license = { text = "MIT" }
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "pandas>=2.3.3",
+    "prefect>=3.0",
+    "redis>=5.0",
+    "scikit-learn>=1.8.0",
+    "xgboost>=3.1.3",
+]
+
+[project.scripts]
+prefect-eta-flow = "prefect_eta_flow:main"
