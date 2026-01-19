@@ -1,0 +1,10 @@
+[
+  {
+    "vehicle_id": "V001",
+    "trip_id": "FAKE_TRIP_001",
+    "latitude": 9.93,
+    "longitude": -84.08,
+    "speed": 15,
+    "timestamp": 1762132640
+  }
+]
