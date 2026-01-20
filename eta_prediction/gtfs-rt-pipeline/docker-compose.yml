@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gtfs
+      POSTGRES_PASSWORD: gtfs
+      POSTGRES_DB: gtfs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gtfs -d gtfs"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.django
+    env_file: .env
+    working_dir: /app/gtfs-rt-pipeline
+    volumes:
+      - .:/app/gtfs-rt-pipeline
+      - ../datasets:/app/datasets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: >
+      bash -c "
+        python manage.py migrate --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.django
+    env_file: .env
+    working_dir: /app/gtfs-rt-pipeline
+    volumes:
+      - .:/app/gtfs-rt-pipeline
+      - ../datasets:/app/datasets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      bash -c "
+        celery -A ingestproj worker -Q fetch,upsert -l INFO
+      "
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.django
+    env_file: .env
+    working_dir: /app/gtfs-rt-pipeline
+    volumes:
+      - .:/app/gtfs-rt-pipeline
+    depends_on:
+      celery-worker:
+        condition: service_started
+    command: >
+      bash -c "
+        celery -A ingestproj beat -l INFO
+      "
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

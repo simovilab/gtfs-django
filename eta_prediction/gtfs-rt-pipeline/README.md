@@ -50,6 +50,7 @@ gtfs-rt-pipeline/
    ```
 
 2. **Configure environment** (`.env`)
+   Copy `.env.example` to `.env` and edit the values for your feeds/credentials.
    ```env
    # --- Django ---
    DJANGO_SECRET_KEY=change-me
@@ -73,20 +74,26 @@ gtfs-rt-pipeline/
    HTTP_READ_TIMEOUT=5
    ```
 
-3. **Run services**
+3. **Run services with Docker Compose**
    ```bash
-   # Start Redis + Postgres
-   redis-server &
-   postgres -D /usr/local/var/postgres &
-   
-   # Django
-   python manage.py migrate
-   python manage.py createsuperuser
-   python manage.py runserver
-   
-   # Celery
-   celery -A ingestproj worker -Q fetch,upsert -l INFO
-   celery -A ingestproj beat -l INFO
+   cd gtfs-rt-pipeline
+   cp .env.example .env   # if you haven't already
+
+   # Build images + boot Postgres & Redis first
+   docker compose up -d postgres redis
+
+   # Run migrations + create admin user
+   docker compose run --rm web python manage.py migrate
+   docker compose run --rm web python manage.py createsuperuser
+
+   # Start Django + Celery worker/beat
+   docker compose up -d web celery-worker celery-beat
+   ```
+
+   Logs:
+   ```bash
+   docker compose logs -f web
+   docker compose logs -f celery-worker
    ```
 
 ---
@@ -107,10 +114,12 @@ gtfs-rt-pipeline/
 ## 🔍 Inspecting Data
 
 **Django Admin**  
+Ensure `docker compose up -d web` is running, then visit `http://localhost:8000/admin`.  
+Need a shell inside the container?
 ```bash
-python manage.py runserver
+docker compose exec web python manage.py shell
 ```
-Go to `localhost:8000/admin` → log in with your superuser → browse RawMessages, Vehicle Positions, and Trip Updates.
+Log in with your superuser → browse RawMessages, Vehicle Positions, and Trip Updates.
 
 ---
 
@@ -120,4 +129,3 @@ Go to `localhost:8000/admin` → log in with your superuser → browse RawMessag
 - Deduplication enforced  
 - VP & TU both flowing into Postgres  
 - Admin UI enabled for quick inspection  
-
