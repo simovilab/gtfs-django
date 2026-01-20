@@ -12,6 +12,8 @@ RUN apt-get update \
         curl \
         ca-certificates \
         libpq-dev \
+        gdal-bin \
+        libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip \
