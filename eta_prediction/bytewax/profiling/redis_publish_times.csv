@@ -1,0 +1,11 @@
+bucket_start_ms,bucket_end_ms,count,percentage
+0,5,555,99.11
+5,10,3,0.54
+10,15,1,0.18
+15,20,1,0.18
+
+metric,value
+total_calls,560
+min_ms,0.131
+max_ms,18.274
+avg_ms,0.515

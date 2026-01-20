@@ -1,0 +1,30 @@
+[project]
+name = "gtfsrt-tools"
+version = "0.1.0"
+description = "Utilities for exploring GTFS-Realtime feeds (Vehicle Positions, Trip Updates, Alerts)."
+authors = [
+    { name = "Jæ" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.12, <3.13"
+
+dependencies = [
+    "bytewax>=0.21.1",
+    "celery>=5.5.3",
+    "django>=4.2.25",
+    "gtfs-realtime-bindings>=1.0.0",
+    "matplotlib>=3.9.4",
+    "pandas>=2.3.3",
+    "psycopg>=3.2.11",
+    "redis>=7.0.1",
+    "requests>=2.31",
+    "scikit-learn>=1.7.2",
+    "xgboost>=3.1.2",
+]
+
+[tool.uv.workspace]
+members = [
+    "feature_engineering/proj",
+    "feature_engineering",
+]
