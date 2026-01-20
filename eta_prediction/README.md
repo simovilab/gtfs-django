@@ -40,47 +40,77 @@ The fastest way to get started on any machine.
 - Docker Compose
 - Git
 
-### 1. Clone and Build
+### 1. Clone and Setup
 
 ```bash
 git clone https://github.com/simovilab/gtfs-django.git
 cd gtfs-django/eta_prediction
-make build
+
+# Copy environment configuration
+cp .env.example .env
+
+# Build all images
+docker compose -f docker-compose.full.yml build
 ```
 
-### 2. Verify Installation
+### 2. Run the Full Pipeline
+
+The full pipeline includes: PostgreSQL, Redis, Django, Celery, ETA Service, MQTT, and Bytewax.
 
 ```bash
-make verify
+# Start core services (database, cache, ingestion)
+docker compose -f docker-compose.full.yml up -d
+
+# Start with stream processing (adds MQTT broker + Bytewax)
+docker compose -f docker-compose.full.yml --profile streaming up -d
+
+# Start with scheduled ingestion (adds Celery Beat)
+docker compose -f docker-compose.full.yml --profile ingestion up -d
+
+# Start everything (ingestion + streaming + runtime inference)
+docker compose -f docker-compose.full.yml \
+  --profile ingestion \
+  --profile streaming \
+  --profile runtime up -d
 ```
 
-This will:
-- Start Redis
-- Run the test suite
-- Verify the estimator loads correctly
+### 3. Interactive CLI
 
-### 3. Run Services
+Use the `eta-cli` service for feature engineering, training, and manual inference:
 
 ```bash
-# Start Redis + run tests
-make up
+# Start interactive shell
+docker compose -f docker-compose.full.yml run eta-cli bash
 
-# Or start Redis only, then run commands manually
-make redis
-docker compose run --rm eta python -c "from eta_service.estimator import estimate_stop_times; print('OK')"
-
-# Interactive shell
-make shell
-
-# Start Prefect flow (continuous polling)
-make prefect
+# Inside the container:
+python -c "from eta_service.estimator import estimate_stop_times; print('OK')"
+python models/train_all_models.py --dataset sample_dataset --models xgboost
 ```
 
-### Common Commands
+### 4. Seed Test Data
+
+For testing without live feeds:
+
+```bash
+# Seed mock stops and shapes into Redis
+docker compose -f docker-compose.full.yml --profile seed run cache-seeder
+```
+
+### Docker Compose Profiles
+
+| Profile | Services Added | Use Case |
+|---------|---------------|----------|
+| (default) | postgres, redis, django, celery-worker | Core ingestion |
+| `ingestion` | + celery-beat | Scheduled feed polling |
+| `streaming` | + mqtt, mqtt-subscriber, bytewax | Real-time stream processing |
+| `runtime` | + prefect-flow | Prefect-orchestrated inference |
+| `seed` | cache-seeder (one-shot) | Populate Redis with test data |
+
+### Quick Commands
 
 | Command | Description |
 |---------|-------------|
-| `make build` | Build Docker image |
+| `make build` | Build Docker image (basic) |
 | `make up` | Start Redis + run tests |
 | `make test` | Run test suite |
 | `make shell` | Interactive shell in container |
@@ -221,12 +251,32 @@ uv run pytest
 
 ## Environment Variables
 
+Copy `.env.example` to `.env` and customize as needed.
+
+**Core ETA Service:**
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `MODEL_REGISTRY_DIR` | Path to trained models | `models/trained` |
 | `ETA_TIMEZONE` | Default timezone | `America/Costa_Rica` |
-| `ETA_DEBUG` | Enable debug logging | `false` |
-| `ETA_LOG_JSON` | JSON log output | `false` |
+| `ETA_DEBUG` | Enable debug logging | `0` |
+| `ETA_LOG_JSON` | JSON log output | `0` |
+
+**GTFS-RT Ingestion:**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GTFSRT_VEHICLE_POSITIONS_URL` | Vehicle positions feed URL | MBTA feed |
+| `GTFSRT_TRIP_UPDATES_URL` | Trip updates feed URL | MBTA feed |
+| `POLL_SECONDS` | Feed polling interval | `30` |
+| `DATABASE_URL` | PostgreSQL connection string | - |
+
+**Redis & MQTT:**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_HOST` | Redis hostname | `redis` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `MQTT_HOST` | MQTT broker hostname | `mqtt` |
+| `MQTT_PORT` | MQTT broker port | `1883` |
+| `MQTT_TOPIC` | MQTT topic pattern | `transit/vehicles/bus/#` |
 
 ## Dependencies
 

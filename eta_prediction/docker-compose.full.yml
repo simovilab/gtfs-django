@@ -1,0 +1,317 @@
+# Full ETA Prediction Pipeline - Docker Compose
+#
+# This compose file runs the ENTIRE pipeline:
+#   - PostgreSQL (GTFS data storage)
+#   - Redis (Celery broker + runtime cache)
+#   - Django (data ingestion API)
+#   - Celery Worker (background tasks)
+#   - Celery Beat (scheduled ingestion)
+#   - ETA Service (feature engineering, training, inference)
+#   - MQTT Broker (vehicle telemetry transport)
+#   - MQTT Subscriber (bridges MQTT → Redis)
+#   - Bytewax (low-latency stream processing)
+#
+# Usage:
+#   # Start core services (postgres, redis, django, celery)
+#   docker compose -f docker-compose.full.yml up -d
+#
+#   # Start with stream processing (adds mqtt, bytewax)
+#   docker compose -f docker-compose.full.yml --profile streaming up -d
+#
+#   # Start with scheduled ingestion
+#   docker compose -f docker-compose.full.yml --profile ingestion up -d
+#
+#   # Start everything
+#   docker compose -f docker-compose.full.yml --profile ingestion --profile streaming --profile runtime up -d
+#
+#   # Interactive CLI for training/inference
+#   docker compose -f docker-compose.full.yml run eta-cli bash
+#
+# For testing without live feeds, use the seed scripts.
+
+services:
+  # ==========================================================================
+  # PostgreSQL - GTFS Data Storage
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gtfs
+      POSTGRES_PASSWORD: gtfs
+      POSTGRES_DB: gtfs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gtfs -d gtfs"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Redis - Celery Broker + Runtime Cache
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Django Web - Data Ingestion API
+  # ==========================================================================
+  django:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.django
+    environment:
+      - DJANGO_SECRET_KEY=dev-secret-key-change-in-production
+      - DJANGO_DEBUG=True
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,django
+      - DATABASE_URL=postgresql://gtfs:gtfs@postgres:5432/gtfs
+      - REDIS_URL=redis://redis:6379/0
+      - FEED_NAME=test
+      - GTFSRT_VEHICLE_POSITIONS_URL=${GTFSRT_VEHICLE_POSITIONS_URL:-https://cdn.mbta.com/realtime/VehiclePositions.pb}
+      - GTFSRT_TRIP_UPDATES_URL=${GTFSRT_TRIP_UPDATES_URL:-https://cdn.mbta.com/realtime/TripUpdates.pb}
+      - POLL_SECONDS=${POLL_SECONDS:-30}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./gtfs-rt-pipeline:/app/gtfs-rt-pipeline
+      - ./datasets:/app/datasets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      bash -c "
+        cd /app/gtfs-rt-pipeline &&
+        python manage.py migrate --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Celery Worker - Background Ingestion Tasks
+  # ==========================================================================
+  celery-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.django
+    environment:
+      - DJANGO_SECRET_KEY=dev-secret-key-change-in-production
+      - DJANGO_DEBUG=True
+      - DATABASE_URL=postgresql://gtfs:gtfs@postgres:5432/gtfs
+      - REDIS_URL=redis://redis:6379/0
+      - FEED_NAME=test
+      - GTFSRT_VEHICLE_POSITIONS_URL=${GTFSRT_VEHICLE_POSITIONS_URL:-https://cdn.mbta.com/realtime/VehiclePositions.pb}
+      - GTFSRT_TRIP_UPDATES_URL=${GTFSRT_TRIP_UPDATES_URL:-https://cdn.mbta.com/realtime/TripUpdates.pb}
+    volumes:
+      - ./gtfs-rt-pipeline:/app/gtfs-rt-pipeline
+      - ./datasets:/app/datasets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      bash -c "
+        cd /app/gtfs-rt-pipeline &&
+        celery -A ingestproj worker -Q fetch,upsert -l INFO
+      "
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Celery Beat - Scheduled Ingestion
+  # ==========================================================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.django
+    environment:
+      - DJANGO_SECRET_KEY=dev-secret-key-change-in-production
+      - DJANGO_DEBUG=True
+      - DATABASE_URL=postgresql://gtfs:gtfs@postgres:5432/gtfs
+      - REDIS_URL=redis://redis:6379/0
+      - FEED_NAME=test
+      - GTFSRT_VEHICLE_POSITIONS_URL=${GTFSRT_VEHICLE_POSITIONS_URL:-https://cdn.mbta.com/realtime/VehiclePositions.pb}
+      - GTFSRT_TRIP_UPDATES_URL=${GTFSRT_TRIP_UPDATES_URL:-https://cdn.mbta.com/realtime/TripUpdates.pb}
+      - POLL_SECONDS=${POLL_SECONDS:-30}
+    volumes:
+      - ./gtfs-rt-pipeline:/app/gtfs-rt-pipeline
+    depends_on:
+      - celery-worker
+    command: >
+      bash -c "
+        cd /app/gtfs-rt-pipeline &&
+        celery -A ingestproj beat -l INFO
+      "
+    profiles:
+      - ingestion
+    restart: unless-stopped
+
+  # ==========================================================================
+  # ETA CLI - Feature Engineering, Training, Inference
+  # ==========================================================================
+  eta-cli:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.eta
+    environment:
+      - DATABASE_URL=postgresql://gtfs:gtfs@postgres:5432/gtfs
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_REGISTRY_DIR=/app/models/trained
+      - ETA_TIMEZONE=America/Costa_Rica
+      - ETA_DEBUG=${ETA_DEBUG:-0}
+      - DJANGO_SETTINGS_MODULE=ingestproj.settings
+      - PYTHONPATH=/app:/app/gtfs-rt-pipeline
+    volumes:
+      - .:/app
+      - /app/.venv
+      - /app/bytewax/.venv
+      - /app/prefect/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["bash"]
+    stdin_open: true
+    tty: true
+
+  # ==========================================================================
+  # Prefect Flow - Runtime Inference
+  # ==========================================================================
+  prefect-flow:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.eta
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_REGISTRY_DIR=/app/models/trained
+      - ETA_TIMEZONE=America/Costa_Rica
+    volumes:
+      - ./models/trained:/app/models/trained
+      - ./datasets:/app/datasets
+      - ./profiling:/app/profiling
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      python prefect/prefect_eta_flow.py
+      --redis-host redis
+      --redis-port 6379
+      --iterations 0
+      --poll-interval 2.0
+    profiles:
+      - runtime
+    restart: unless-stopped
+
+  # ==========================================================================
+  # MQTT Broker - Vehicle Telemetry Transport
+  # ==========================================================================
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    command: mosquitto -c /mosquitto-no-auth.conf
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - streaming
+    restart: unless-stopped
+
+  # ==========================================================================
+  # MQTT Subscriber - Bridge MQTT → Redis
+  # ==========================================================================
+  mqtt-subscriber:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mqtt-subscriber
+    environment:
+      - MQTT_HOST=mqtt
+      - MQTT_PORT=1883
+      - MQTT_USER=${MQTT_USER:-admin}
+      - MQTT_PASS=${MQTT_PASS:-admin}
+      - MQTT_TOPIC=${MQTT_TOPIC:-transit/vehicles/bus/#}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_TTL=300
+    depends_on:
+      mqtt:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - streaming
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Bytewax - Low-Latency Stream Processing
+  # ==========================================================================
+  bytewax:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bytewax
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_REGISTRY_DIR=/app/models/trained
+      - ETA_TIMEZONE=${ETA_TIMEZONE:-America/Costa_Rica}
+      - ETA_DEBUG=${ETA_DEBUG:-0}
+    volumes:
+      - ./models/trained:/app/models/trained
+      - ./datasets:/app/datasets
+      - ./profiling:/app/profiling
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - streaming
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Cache Seeder - Populate Redis with Mock Stops/Shapes (one-shot)
+  # ==========================================================================
+  cache-seeder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bytewax
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./bytewax:/app/bytewax
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Working dir is /app/bytewax from Dockerfile.bytewax
+    command: python mock_stops_and_shapes.py
+    profiles:
+      - seed
+
+volumes:
+  postgres_data:
+  redis_data:
+  mqtt_data:
+  mqtt_log:

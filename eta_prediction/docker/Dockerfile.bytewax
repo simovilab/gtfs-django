@@ -1,0 +1,53 @@
+# Bytewax Stream Processing - Low-latency ETA Predictions
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_SYSTEM_PYTHON=1 \
+    PYTHONPATH=/app \
+    MODEL_REGISTRY_DIR=/app/models/trained \
+    ETA_TIMEZONE=America/Costa_Rica \
+    REDIS_HOST=redis \
+    REDIS_PORT=6379
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir uv
+
+WORKDIR /app
+
+# Copy project files
+COPY . .
+
+# Install bytewax dependencies
+RUN uv pip install --system \
+    # Bytewax core
+    bytewax>=0.21.1 \
+    # ML/Data dependencies (same as eta)
+    pandas>=2.3.3 \
+    numpy>=1.26 \
+    scikit-learn>=1.7.2 \
+    xgboost>=3.1.2 \
+    fastparquet>=2024.11.0 \
+    # Redis
+    redis>=5.0 \
+    # Utils
+    holidays \
+    requests>=2.32 \
+    python-dotenv>=1.0
+
+# Create directories
+RUN mkdir -p /app/models/trained /app/datasets /app/profiling
+
+# Set working directory to bytewax for running the flow
+WORKDIR /app/bytewax
+
+# Default: run the Bytewax prediction flow
+CMD ["python", "-m", "bytewax.run", "pred2redis"]

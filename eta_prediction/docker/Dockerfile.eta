@@ -1,0 +1,55 @@
+# ETA Service - Feature Engineering, Training, Inference
+# Includes Django ORM access for dataset building
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app:/app/gtfs-rt-pipeline \
+    MODEL_REGISTRY_DIR=/app/models/trained \
+    UV_SYSTEM_PYTHON=1 \
+    ETA_TIMEZONE=America/Costa_Rica \
+    DJANGO_SETTINGS_MODULE=ingestproj.settings
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        ca-certificates \
+        libpq-dev \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir uv
+
+WORKDIR /app
+
+# Copy everything
+COPY . .
+
+# Install all dependencies
+RUN uv pip install --system \
+    # Core ML/Data
+    pandas>=2.3.3 \
+    numpy>=1.26 \
+    scikit-learn>=1.7.2 \
+    xgboost>=3.1.2 \
+    fastparquet>=2024.11.0 \
+    # Django for feature engineering
+    Django>=5.0 \
+    psycopg[binary,pool]>=3.2 \
+    django-environ>=0.11 \
+    # Runtime
+    redis>=5.0 \
+    requests>=2.32 \
+    prefect>=3.0 \
+    # Utils
+    holidays \
+    pytest \
+    python-dotenv>=1.0
+
+# Create directories
+RUN mkdir -p /app/models/trained /app/datasets /app/profiling
+
+CMD ["bash"]

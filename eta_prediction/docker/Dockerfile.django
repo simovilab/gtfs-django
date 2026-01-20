@@ -1,0 +1,31 @@
+# Django + Celery for GTFS-RT Ingestion
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_SYSTEM_PYTHON=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        ca-certificates \
+        libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir uv
+
+WORKDIR /app
+
+# Copy and install gtfs-rt-pipeline dependencies
+COPY gtfs-rt-pipeline/pyproject.toml /app/gtfs-rt-pipeline/
+RUN cd /app/gtfs-rt-pipeline && uv pip install --system -e .
+
+# Copy the rest
+COPY gtfs-rt-pipeline /app/gtfs-rt-pipeline
+
+WORKDIR /app/gtfs-rt-pipeline
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

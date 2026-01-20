@@ -1,0 +1,41 @@
+# MQTT to Redis Subscriber Bridge
+# Bridges vehicle telemetry from MQTT broker to Redis cache
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_SYSTEM_PYTHON=1 \
+    # MQTT Configuration
+    MQTT_HOST=mqtt \
+    MQTT_PORT=1883 \
+    MQTT_USER=admin \
+    MQTT_PASS=admin \
+    MQTT_TOPIC=transit/vehicles/bus/# \
+    # Redis Configuration
+    REDIS_HOST=redis \
+    REDIS_PORT=6379 \
+    REDIS_DB=0 \
+    REDIS_TTL=300
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir uv
+
+WORKDIR /app
+
+# Install subscriber dependencies
+RUN uv pip install --system \
+    paho-mqtt>=2.1.0 \
+    redis>=7.0.0
+
+# Copy only the subscriber script
+COPY bytewax/subscriber/mqtt2redis.py /app/mqtt2redis.py
+
+# Default: run the MQTT to Redis bridge
+CMD ["python", "mqtt2redis.py"]

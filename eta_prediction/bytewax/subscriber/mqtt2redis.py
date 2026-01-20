@@ -9,6 +9,7 @@ Usage:
 """
 
 import json
+import os
 import time
 import sys
 from datetime import datetime, timezone
@@ -16,27 +17,27 @@ import paho.mqtt.client as mqtt
 import redis
 
 # ============================================================================
-# Configuration
+# Configuration (from environment variables with defaults)
 # ============================================================================
 
 # MQTT Configuration
-MQTT_HOST = "localhost"
-MQTT_PORT = 1883
-MQTT_USER = "admin"
-MQTT_PASS = "admin"
-MQTT_TOPIC = "transit/vehicles/bus/#"  # Subscribe to all bus topics
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_USER = os.getenv("MQTT_USER", "admin")
+MQTT_PASS = os.getenv("MQTT_PASS", "admin")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "transit/vehicles/bus/#")
 
 # Redis Configuration
-REDIS_HOST = "localhost"
-REDIS_PORT = 6379
-REDIS_DB = 0
-REDIS_PASSWORD = None
-REDIS_KEY_PREFIX = "vehicle:"  # Keys will be like "vehicle:BUS-001"
-REDIS_TTL = 300  # Time to live in seconds (5 minutes)
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+REDIS_KEY_PREFIX = os.getenv("REDIS_KEY_PREFIX", "vehicle:")
+REDIS_TTL = int(os.getenv("REDIS_TTL", "300"))
 
 # Optional: Publish to Redis channel for real-time subscribers
-REDIS_PUBSUB_ENABLED = False
-REDIS_PUBSUB_CHANNEL = "vehicle_updates"
+REDIS_PUBSUB_ENABLED = os.getenv("REDIS_PUBSUB_ENABLED", "false").lower() == "true"
+REDIS_PUBSUB_CHANNEL = os.getenv("REDIS_PUBSUB_CHANNEL", "vehicle_updates")
 
 # Data validation - ensure all required fields are present
 REQUIRED_FIELDS = [
