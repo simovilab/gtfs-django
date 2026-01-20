@@ -3,16 +3,26 @@ ETA Service - Enhanced Implementation
 Estimates stop arrival times from vehicle positions with route-specific model support.
 """
 
-import sys
-from pathlib import Path
 from datetime import datetime, timezone
 import math
 
-# Add parent directories to path for imports
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "feature_engineering"))
-sys.path.insert(0, str(project_root / "models"))
+# Use centralized configuration (eliminates sys.path manipulation)
+from core.config import get_config
+from core.logging import get_logger
+from core.exceptions import (
+    ModelNotFoundError,
+    ModelLoadError,
+    PredictionError,
+)
+from core.validation import (
+    validate_vehicle_position,
+    validate_stops_list,
+)
+from core.exceptions import InvalidVehiclePositionError, InvalidStopError
+
+# Initialize config to ensure paths are set up
+_config = get_config()
+_logger = get_logger("estimator")
 
 from feature_engineering.temporal import extract_temporal_features
 from models.common.registry import get_registry
@@ -174,11 +184,11 @@ def estimate_stop_times(
         vp_timestamp_str = vp_timestamp_str.replace('Z', '+00:00')
     vp_timestamp = datetime.fromisoformat(vp_timestamp_str)
 
-    # Extract temporal features
+    # Extract temporal features (using config for timezone)
     temporal_features = extract_temporal_features(
         vp_timestamp,
-        tz='America/Costa_Rica',
-        region='CR'
+        tz=_config.default_timezone,
+        region=_config.default_region
     )
 
     # Determine route
@@ -202,9 +212,9 @@ def estimate_stop_times(
 
             if model_key:
                 model_scope = 'route'
-                print(f"[ETA Service] Using route-specific model for route {route_id}")
+                _logger.debug("Using route-specific model", route_id=route_id, model_key=model_key)
             else:
-                print(f"[ETA Service] No route model for {route_id}. Trying global.")
+                _logger.debug("No route model found, trying global", route_id=route_id)
                 model_key = registry.get_best_model(
                     model_type=model_type,
                     route_id='global',
@@ -301,9 +311,9 @@ def estimate_stop_times(
             'is_weekend': temporal_features['is_weekend'],
             'is_holiday': temporal_features['is_holiday'],
             'is_peak_hour': temporal_features['is_peak_hour'],
-            'temperature_c': 25.0,
-            'precipitation_mm': 0.0,
-            'wind_speed_kmh': None,
+            'temperature_c': _config.default_temperature_c,
+            'precipitation_mm': _config.default_precipitation_mm,
+            'wind_speed_kmh': _config.default_wind_speed_kmh,
         }
 
         try:

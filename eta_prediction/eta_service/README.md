@@ -6,22 +6,14 @@ Real-time arrival time estimation service for transit vehicles.
 
 The `eta_service` provides a production-ready interface for generating ETA predictions from live vehicle positions. It bridges the real-time data stream (MQTT/Redis) with trained ML models.
 
-## Current Status: MVP (Phase 1)
+## Features
 
-**What's Working:**
-- ✅ Basic `estimate_stop_times()` function
-- ✅ Temporal + spatial feature extraction
-- ✅ Model registry integration
-- ✅ Predictions for next N stops
-- ✅ Error handling for missing models/data
-
-**Not Yet Implemented:**
-- ⏳ Redis caching (upcoming stops, predictions)
-- ⏳ Persistent route-specific model overrides
-- ⏳ Shape-aware progress (currently geometric fallback only)
-- ⏳ Weather integrations (currently constants)
-- ⏳ Confidence intervals
-- ⏳ Database integration for stop sequences
+- `estimate_stop_times()` - Main prediction function
+- Smart model selection (route-specific → global → fallback)
+- Temporal + spatial feature extraction
+- Structured logging via `core.logging`
+- Input validation via `core.validation`
+- Configurable defaults via `core.config`
 
 ---
 
@@ -181,45 +173,21 @@ Return predictions dict
 ```
 eta_service/
 ├── __init__.py          # Module exports
-├── estimator.py         # Main estimation logic (MVP)
+├── estimator.py         # Main estimation logic
 ├── test_estimator.py    # Test suite
-├── cache.py             # (TODO: Redis operations)
-├── config.py            # (TODO: Configuration)
 └── README.md            # This file
 ```
 
----
-
-## Next Steps (Phase 2)
-
-1. **Redis Integration**
-   - Cache upcoming stops by route
-   - Store predictions with TTL
-   - Implement prediction retrieval API
-
-2. **Enhanced Model Selection**
-   - Route-specific model lookup
-   - Fallback hierarchy
-   - Model performance monitoring
-
-3. **Additional Features**
-   - Shape-derived progress metrics
-   - Weather integration
-   - Confidence intervals
-
-4. **Performance Optimization**
-   - Batch predictions for multiple vehicles
-   - Model warm-up/preloading
-   - Feature extraction caching
+Configuration, logging, and validation are now provided by the `core/` module at the project root.
 
 ---
 
 ## Dependencies
 
+- `core` module (config, logging, validation, exceptions)
 - `feature_engineering` module (temporal, spatial)
 - `models` module (registry, trained models)
 - Python 3.10+
-- Standard library: `math`, `datetime`, `pathlib`
 
 ---
 

@@ -11,6 +11,10 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import pandas as pd
 
+from core.logging import get_logger
+
+_logger = get_logger("registry")
+
 
 class ModelRegistry:
     """
@@ -98,8 +102,9 @@ class ModelRegistry:
         }
         self._save_registry()
         
-        route_info = f" (route: {metadata.get('route_id')})" if metadata.get('route_id') else " (global)"
-        print(f"✓ Saved model: {model_key}{route_info}")
+        route_id = metadata.get('route_id')
+        scope = "route" if route_id else "global"
+        _logger.info("Model saved", model_key=model_key, scope=scope, route_id=route_id)
         return model_path
     
     def load_model(self, model_key: str) -> Any:
@@ -192,7 +197,7 @@ class ModelRegistry:
                     'r2': meta.get('metrics', {}).get('test_r2', None),
                 })
             except Exception as e:
-                print(f"Warning: Could not load metadata for {key}: {e}")
+                _logger.warning("Could not load metadata", model_key=key, error=str(e))
                 models.append({
                     'model_key': key,
                     'model_type': info.get('model_type', 'unknown'),
@@ -231,8 +236,8 @@ class ModelRegistry:
         # Remove from registry
         del self.registry[model_key]
         self._save_registry()
-        
-        print(f"✓ Deleted model: {model_key}")
+
+        _logger.info("Model deleted", model_key=model_key)
         return True
     
     def get_best_model(self, 
