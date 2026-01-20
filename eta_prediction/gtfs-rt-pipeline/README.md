@@ -100,6 +100,8 @@ gtfs-rt-pipeline/
    - `localhost:16379` → Redis `6379`
    - `localhost:18000` → Django web `8000`
 
+   > ℹ️ The `postgres` service uses the `postgis/postgis:16-3.4` image so the `postgis` extension is available during migrations.
+
 ---
 
 ## 🔄 How It Works

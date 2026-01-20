@@ -100,6 +100,8 @@ cp .env.example .env
 # Start infra
 docker compose up -d postgres redis
 
+# (Postgres container ships with PostGIS via the postgis/postgis:16-3.4 image)
+
 # Run migrations + create a superuser
 docker compose run --rm web python manage.py migrate
 docker compose run --rm web python manage.py createsuperuser
