@@ -7,9 +7,11 @@ from pathlib import Path
 import json
 import os
 
-sys.path.append(str(Path(__file__).parent))
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-from common.registry import get_registry
+from models.common.registry import get_registry
 
 
 def check_registry_status():

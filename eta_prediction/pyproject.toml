@@ -25,7 +25,18 @@ dependencies = [
   "matplotlib>=3.9.4",
   "scikit-learn>=1.7.2",
   "xgboost>=3.1.2",
+  "holidays>=0.40",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["core*", "eta_service*", "feature_engineering*", "models*"]
+
+[tool.uv]
+package = true
 
 [tool.uv.workspace]
 members = [
