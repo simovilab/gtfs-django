@@ -11,6 +11,12 @@
 #   - MQTT Subscriber (bridges MQTT → Redis)
 #   - Bytewax (low-latency stream processing)
 #
+# Port Mappings (Host → Container):
+#   - PostgreSQL: 15432 → 5432
+#   - Redis:      16379 → 6379
+#   - Django:     18000 → 8000
+#   - MQTT:       11883 → 1883, 19001 → 9001
+#
 # Usage:
 #   # Start core services (postgres, redis, django, celery)
 #   docker compose -f docker-compose.full.yml up -d
@@ -40,7 +46,7 @@ services:
       POSTGRES_PASSWORD: gtfs
       POSTGRES_DB: gtfs
     ports:
-      - "5432:5432"
+      - "15432:5432"  # Host 15432 → Container 5432 (avoids conflict with local PostgreSQL)
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -56,7 +62,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "16379:6379"  # Host 16379 → Container 6379 (avoids conflict with local Redis)
     volumes:
       - redis_data:/data
     healthcheck:
@@ -84,7 +90,7 @@ services:
       - GTFSRT_TRIP_UPDATES_URL=${GTFSRT_TRIP_UPDATES_URL:-https://cdn.mbta.com/realtime/TripUpdates.pb}
       - POLL_SECONDS=${POLL_SECONDS:-30}
     ports:
-      - "8000:8000"
+      - "18000:8000"  # Host 18000 → Container 8000 (avoids conflict with local web servers)
     volumes:
       - ./gtfs-rt-pipeline:/app/gtfs-rt-pipeline
       - ./datasets:/app/datasets
@@ -225,8 +231,8 @@ services:
   mqtt:
     image: eclipse-mosquitto:2
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "11883:1883"  # Host 11883 → Container 1883 (avoids conflict with local MQTT)
+      - "19001:9001"  # Host 19001 → Container 9001 (WebSocket)
     volumes:
       - mqtt_data:/mosquitto/data
       - mqtt_log:/mosquitto/log
