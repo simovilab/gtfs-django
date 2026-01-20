@@ -1,0 +1,109 @@
+# ETA Prediction System - Docker Compose
+#
+# Quick Start:
+#   docker compose up -d redis      # Start Redis only
+#   docker compose run eta pytest   # Run tests
+#   docker compose up               # Full stack
+#
+# Profiles:
+#   docker compose --profile prefect up   # Include Prefect server
+#   docker compose --profile dev up       # Development mode with hot reload
+
+services:
+  # ==========================================================================
+  # Redis - Required for vehicle caching and predictions
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================================================
+  # ETA Prediction Service
+  # ==========================================================================
+  eta:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_REGISTRY_DIR=/app/models/trained
+      - ETA_TIMEZONE=America/Costa_Rica
+      - ETA_DEBUG=${ETA_DEBUG:-0}
+      - ETA_LOG_JSON=${ETA_LOG_JSON:-0}
+    volumes:
+      # Mount models and datasets for persistence
+      - ./models/trained:/app/models/trained
+      - ./datasets:/app/datasets
+      - ./profiling:/app/profiling
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Default: run tests
+    command: ["pytest", "core/tests/test_core.py", "-v"]
+
+  # ==========================================================================
+  # Prefect Flow Runner
+  # ==========================================================================
+  prefect-flow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_REGISTRY_DIR=/app/models/trained
+      - ETA_TIMEZONE=America/Costa_Rica
+    volumes:
+      - ./models/trained:/app/models/trained
+      - ./datasets:/app/datasets
+      - ./profiling:/app/profiling
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      python prefect/prefect_eta_flow.py
+      --redis-host redis
+      --redis-port 6379
+      --iterations 0
+      --poll-interval 1.0
+    profiles:
+      - prefect
+
+  # ==========================================================================
+  # Development mode - with source code mounted for hot reload
+  # ==========================================================================
+  eta-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_REGISTRY_DIR=/app/models/trained
+      - ETA_TIMEZONE=America/Costa_Rica
+      - ETA_DEBUG=1
+    volumes:
+      # Mount entire source for development
+      - .:/app
+      - /app/.venv  # Exclude venv from mount
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["bash"]
+    stdin_open: true
+    tty: true
+    profiles:
+      - dev
+
+volumes:
+  redis_data:

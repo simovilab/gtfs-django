@@ -1,0 +1,65 @@
+# Virtual environments
+.venv/
+venv/
+env/
+*/.venv/
+*/venv/
+bytewax/.venv/
+prefect/.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation builds
+docs/_build/
+
+# Test/coverage
+.coverage
+htmlcov/
+.tox/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local config
+.env
+.env.local
+*.local
+
+# Large data files (optional - comment out if needed in container)
+# datasets/*.parquet
+
+# Profiling output (generated at runtime)
+profiling/*.csv
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Jupyter
+.ipynb_checkpoints/

@@ -30,14 +30,76 @@ GTFS-RT Feed → Redis Cache → Stream Processor → ML Models → Predictions 
 └── datasets/                # Training data (parquet)
 ```
 
-## Quick Start
+## Quick Start (Docker)
+
+The fastest way to get started on any machine.
+
+### Prerequisites
+
+- Docker
+- Docker Compose
+- Git
+
+### 1. Clone and Build
+
+```bash
+git clone https://github.com/simovilab/gtfs-django.git
+cd gtfs-django/eta_prediction
+make build
+```
+
+### 2. Verify Installation
+
+```bash
+make verify
+```
+
+This will:
+- Start Redis
+- Run the test suite
+- Verify the estimator loads correctly
+
+### 3. Run Services
+
+```bash
+# Start Redis + run tests
+make up
+
+# Or start Redis only, then run commands manually
+make redis
+docker compose run --rm eta python -c "from eta_service.estimator import estimate_stop_times; print('OK')"
+
+# Interactive shell
+make shell
+
+# Start Prefect flow (continuous polling)
+make prefect
+```
+
+### Common Commands
+
+| Command | Description |
+|---------|-------------|
+| `make build` | Build Docker image |
+| `make up` | Start Redis + run tests |
+| `make test` | Run test suite |
+| `make shell` | Interactive shell in container |
+| `make prefect` | Start Prefect flow |
+| `make dev` | Development mode with hot reload |
+| `make clean` | Remove containers and volumes |
+
+---
+
+## Quick Start (Local)
+
+For development without Docker.
 
 ### Installation
 
 ```bash
 # Clone and install dependencies
-git clone <repo-url>
-cd eta_prediction
+git clone https://github.com/simovilab/gtfs-django.git
+cd gtfs-django/eta_prediction
 uv sync
 ```
 
@@ -145,14 +207,15 @@ Django + Celery pipeline for ingesting GTFS-RT feeds into PostgreSQL.
 
 ## Testing
 
+**With Docker (recommended):**
 ```bash
-# Core module tests
+make test           # Core tests
+make test-all       # Full test suite
+```
+
+**Local:**
+```bash
 .venv/bin/python -m pytest core/tests/test_core.py -v
-
-# Feature engineering tests
-uv run pytest feature_engineering/
-
-# Full test suite
 uv run pytest
 ```
 
@@ -167,10 +230,16 @@ uv run pytest
 
 ## Dependencies
 
-- Python 3.10+
+**Docker (recommended):**
+- Docker
+- Docker Compose
+- Git
+
+**Local development:**
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) for dependency management
 - Redis (for caching and stream processing)
-- PostgreSQL (for GTFS schedule data)
+- PostgreSQL (optional, for GTFS schedule data)
 
 ## License
 
