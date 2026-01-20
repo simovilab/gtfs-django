@@ -18,10 +18,9 @@ import json
 import os
 import sys
 import time
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import redis
 
@@ -30,15 +29,17 @@ import redis
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT_STR = str(REPO_ROOT)
 MODEL_DIR = (REPO_ROOT / "models" / "trained").resolve()
-# Force absolute path so Prefect runs launched from `prefect/` or elsewhere
-# never fall back to a missing relative directory.
-os.environ["MODEL_REGISTRY_DIR"] = str(MODEL_DIR)
+# Respect existing overrides but ensure a usable default for local runs.
+os.environ.setdefault("MODEL_REGISTRY_DIR", str(MODEL_DIR))
 _removed_repo_root = False
 if REPO_ROOT_STR in sys.path:
     sys.path.remove(REPO_ROOT_STR)
     _removed_repo_root = True
 
 from prefect import flow, get_run_logger, task  # type: ignore
+from prefect.artifacts import create_markdown_artifact
+from prefect.blocks.core import Block
+from prefect.context import get_run_context
 
 # Ensure repository modules (eta_service, models, etc.) are importable once
 # Prefect is imported.
@@ -47,6 +48,7 @@ if _removed_repo_root or REPO_ROOT_STR not in sys.path:
 
 from eta_service.estimator import estimate_stop_times
 from models.common.registry import get_registry
+from runtime_config import RedisPipelineConfig, build_runtime_config
 
 _registry_probe = get_registry()
 print(
@@ -199,41 +201,108 @@ class ProfilingSuite:
 PROFILING = ProfilingSuite(output_dir=Path(__file__).resolve().parent / "profiling")
 
 
-@dataclass
-class RedisPipelineConfig:
-    """Settings for the Prefect polling loop."""
-
-    host: str = "localhost"
-    port: int = 6379
-    db: int = 0
-    password: Optional[str] = None
-    vehicle_key_pattern: str = "vehicle:*"
-    route_stops_key_prefix: str = "route_stops:"
-    route_shape_key_prefix: str = "route_shape:"
-    predictions_key_prefix: str = "predictions:"
-    predictions_ttl_seconds: int = 300
-    poll_interval_seconds: float = 1.0
-    max_vehicle_batch: Optional[int] = None
-    max_stops_per_vehicle: int = 3
-    model_key: Optional[str] = None
-    
-    # (
-    #     "xgboost_various_dataset_5_spatial-temporal_global_20251202_063133_"
-    #     "handle_nan=drop_learning_rate=0.05_max_depth=5_n_estimators=200"
-    # )
-
-    def redis_kwargs(self) -> Dict[str, Any]:
-        return {
-            "host": self.host,
-            "port": self.port,
-            "db": self.db,
-            "password": self.password,
-            "decode_responses": True,
-        }
-
-
 # Simple in-memory caches to avoid re-fetching the same JSON blobs every poll.
 _ROUTE_STOPS_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+
+
+def _flow_context_prefix() -> str:
+    """Return a short string describing the active flow run."""
+
+    try:
+        context = get_run_context()
+    except RuntimeError:
+        return "[prefect-eta-runtime]"
+    flow_name = getattr(context.flow, "name", "prefect-eta-runtime")
+    run_id = getattr(getattr(context, "flow_run", None), "id", None)
+    suffix = f" run={run_id}" if run_id else ""
+    return f"[{flow_name}{suffix}]"
+
+
+def _notify_blocks(
+    block_names: Sequence[str], message: str, logger: Any, suppress_errors: bool = True
+) -> None:
+    """Send notifications via Prefect notification blocks."""
+
+    if not block_names:
+        return
+    delivered = False
+    unique_blocks = []
+    for name in block_names:
+        if name and name not in unique_blocks:
+            unique_blocks.append(name)
+
+    for block_name in unique_blocks:
+        try:
+            block = Block.load(block_name)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Failed to load notification block %s: %s", block_name, exc)
+            if not suppress_errors:
+                raise
+            continue
+
+        notify_fn = None
+        for attr in ("notify", "send", "write"):
+            candidate = getattr(block, attr, None)
+            if callable(candidate):
+                notify_fn = candidate
+                break
+
+        if not notify_fn:
+            logger.warning(
+                "Notification block %s does not expose a notify/send method.", block_name
+            )
+            continue
+
+        try:
+            notify_fn(f"{_flow_context_prefix()} {message}")
+            delivered = True
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Notification block %s raised an exception: %s", block_name, exc
+            )
+            if not suppress_errors:
+                raise
+
+    if delivered:
+        logger.info("Sent notifications via blocks: %s", ", ".join(unique_blocks))
+
+
+def _publish_profiling_artifacts(config: RedisPipelineConfig, logger: Any) -> None:
+    """Upload profiling CSVs as Prefect artifacts for UI review."""
+
+    prefix = config.profiling_artifact_key_prefix or "eta-runtime"
+    for name, recorder in PROFILING.recorders.items():
+        path = recorder.output_path
+        if not path.exists():
+            continue
+        try:
+            csv_content = path.read_text()
+        except OSError as exc:  # pragma: no cover - best effort logging
+            logger.warning("Unable to read profiling CSV %s: %s", path, exc)
+            continue
+        try:
+            create_markdown_artifact(
+                key=f"{prefix}-{name}",
+                description=f"Prefect ETA runtime profiling data for {name}.",
+                markdown=f"### {name}\n\n```csv\n{csv_content}\n```",
+            )
+        except Exception as exc:  # pragma: no cover - artifact publishing optional
+            logger.warning(
+                "Failed to publish profiling artifact for %s: %s", path.name, exc
+            )
+
+
+def _apply_model_registry_override(path: Optional[str], logger: Any) -> None:
+    """Ensure MODEL_REGISTRY_DIR honors Prefect Block overrides."""
+
+    if not path:
+        return
+    try:
+        resolved = str(Path(path).expanduser().resolve())
+    except OSError:
+        resolved = path
+    os.environ["MODEL_REGISTRY_DIR"] = resolved
+    logger.info("MODEL_REGISTRY_DIR set to %s", resolved)
 
 
 def _build_redis_client(config: RedisPipelineConfig) -> redis.Redis:
@@ -406,7 +475,7 @@ def predict_for_snapshots(
             upcoming_stops=stops[:max_stops] if max_stops else stops,
             route_id=route_id,
             trip_id=vehicle.get("trip_id"),
-            # model_type="ewma",
+            model_type="xgboost",
             model_key=config.model_key,
             max_stops=max_stops,
         )
@@ -453,7 +522,20 @@ def write_predictions_to_redis(
 
 @flow(name="prefect-eta-runtime")
 def prefect_eta_runtime(
-    config: RedisPipelineConfig,
+    redis_host: Optional[str] = None,
+    redis_port: Optional[int] = None,
+    redis_db: Optional[int] = None,
+    redis_password: Optional[str] = None,
+    poll_interval_seconds: Optional[float] = None,
+    max_vehicle_batch: Optional[int] = None,
+    max_stops_per_vehicle: Optional[int] = None,
+    predictions_ttl_seconds: Optional[int] = None,
+    model_key: Optional[str] = None,
+    runtime_settings_block: Optional[str] = None,
+    notification_blocks: Optional[List[str]] = None,
+    zero_prediction_alert_threshold: Optional[int] = None,
+    profiling_artifact_key_prefix: Optional[str] = None,
+    model_registry_dir: Optional[str] = None,
     iterations: int = 0,
 ) -> None:
     """
@@ -461,38 +543,101 @@ def prefect_eta_runtime(
     """
 
     logger = get_run_logger()
+    overrides: Dict[str, Any] = {}
+    if redis_host is not None:
+        overrides["host"] = redis_host
+    if redis_port is not None:
+        overrides["port"] = redis_port
+    if redis_db is not None:
+        overrides["db"] = redis_db
+    if redis_password is not None:
+        overrides["password"] = redis_password
+    if poll_interval_seconds is not None:
+        overrides["poll_interval_seconds"] = poll_interval_seconds
+    if max_vehicle_batch is not None:
+        overrides["max_vehicle_batch"] = max_vehicle_batch
+    if max_stops_per_vehicle is not None:
+        overrides["max_stops_per_vehicle"] = max_stops_per_vehicle
+    if predictions_ttl_seconds is not None:
+        overrides["predictions_ttl_seconds"] = predictions_ttl_seconds
+    if model_key is not None:
+        overrides["model_key"] = model_key
+    if notification_blocks is not None:
+        overrides["notification_blocks"] = notification_blocks
+    if zero_prediction_alert_threshold is not None:
+        overrides["zero_prediction_alert_threshold"] = zero_prediction_alert_threshold
+    if profiling_artifact_key_prefix is not None:
+        overrides["profiling_artifact_key_prefix"] = profiling_artifact_key_prefix
+    if model_registry_dir is not None:
+        overrides["model_registry_dir"] = model_registry_dir
+
+    config = build_runtime_config(
+        runtime_settings_block=runtime_settings_block,
+        overrides=overrides,
+    )
+    _apply_model_registry_override(config.model_registry_dir, logger)
+
     PROFILING.reset()
     loop = 0
+    zero_prediction_streak = 0
     try:
         while True:
             loop += 1
             snapshots = fetch_vehicle_snapshots(config)
+            predictions_written = 0
             if not snapshots:
                 logger.info("No vehicle snapshots found.")
             else:
                 predictions = predict_for_snapshots(config, snapshots)
-                written = write_predictions_to_redis(config, predictions)
+                predictions_written = write_predictions_to_redis(config, predictions)
                 logger.info(
                     "Processed %s vehicles → %s predictions",
                     len(snapshots),
-                    written,
+                    predictions_written,
                 )
+
+            if predictions_written == 0:
+                zero_prediction_streak += 1
+            else:
+                zero_prediction_streak = 0
+
+            threshold = config.zero_prediction_alert_threshold
+            if threshold and zero_prediction_streak >= threshold:
+                _notify_blocks(
+                    config.notification_blocks,
+                    f"No predictions written for {zero_prediction_streak} iterations.",
+                    logger,
+                )
+                zero_prediction_streak = 0
 
             if iterations and loop >= iterations:
                 break
 
             time.sleep(config.poll_interval_seconds)
+    except Exception as exc:
+        _notify_blocks(
+            config.notification_blocks,
+            f"prefect-eta-runtime failed: {exc}",
+            logger,
+        )
+        raise
     finally:
         PROFILING.write_reports()
+        _publish_profiling_artifacts(config, logger)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the Prefect ETA streaming loop.")
-    parser.add_argument("--redis-host", default="localhost")
-    parser.add_argument("--redis-port", type=int, default=6379)
-    parser.add_argument("--redis-db", type=int, default=0)
+    parser.add_argument("--redis-host", default=None)
+    parser.add_argument("--redis-port", type=int, default=None)
+    parser.add_argument("--redis-db", type=int, default=None)
     parser.add_argument("--redis-password", default=None)
-    parser.add_argument("--poll-interval", type=float, default=1.0, help="Seconds between polls.")
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=None,
+        help="Seconds between polls (defaults to Prefect Block or 1.0).",
+    )
     parser.add_argument(
         "--iterations",
         type=int,
@@ -508,13 +653,46 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-stops",
         type=int,
-        default=3,
+        default=None,
         help="Max stops passed to the estimator per vehicle.",
     )
     parser.add_argument(
         "--model-key",
         default=RedisPipelineConfig.model_key,
         help="Model registry key to load for inference (defaults to global xgboost model).",
+    )
+    parser.add_argument(
+        "--predictions-ttl",
+        type=int,
+        default=None,
+        help="TTL (seconds) for `predictions:*` entries.",
+    )
+    parser.add_argument(
+        "--runtime-block",
+        default=None,
+        help="Prefect EtaRuntimeSettings block to use for defaults.",
+    )
+    parser.add_argument(
+        "--notification-block",
+        action="append",
+        default=None,
+        help="Prefect notification block name (repeat for multiple).",
+    )
+    parser.add_argument(
+        "--zero-prediction-threshold",
+        type=int,
+        default=None,
+        help="Alert when zero predictions occur for N iterations (0 disables).",
+    )
+    parser.add_argument(
+        "--profiling-artifact-key-prefix",
+        default=None,
+        help="Prefix for Prefect profiling artifacts.",
+    )
+    parser.add_argument(
+        "--model-registry-dir",
+        default=None,
+        help="Override MODEL_REGISTRY_DIR for estimator loading.",
     )
     return parser
 
@@ -523,17 +701,23 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
-    config = RedisPipelineConfig(
-        host=args.redis_host,
-        port=args.redis_port,
-        db=args.redis_db,
-        password=args.redis_password,
+    prefect_eta_runtime(
+        redis_host=args.redis_host,
+        redis_port=args.redis_port,
+        redis_db=args.redis_db,
+        redis_password=args.redis_password,
         poll_interval_seconds=args.poll_interval,
         max_vehicle_batch=args.max_batch,
         max_stops_per_vehicle=args.max_stops,
+        predictions_ttl_seconds=args.predictions_ttl,
         model_key=args.model_key,
+        runtime_settings_block=args.runtime_block,
+        notification_blocks=args.notification_block,
+        zero_prediction_alert_threshold=args.zero_prediction_threshold,
+        profiling_artifact_key_prefix=args.profiling_artifact_key_prefix,
+        model_registry_dir=args.model_registry_dir,
+        iterations=args.iterations,
     )
-    prefect_eta_runtime(config=config, iterations=args.iterations)
 
 
 if __name__ == "__main__":
