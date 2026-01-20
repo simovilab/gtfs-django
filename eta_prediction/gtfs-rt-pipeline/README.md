@@ -95,6 +95,10 @@ gtfs-rt-pipeline/
    docker compose logs -f web
    docker compose logs -f celery-worker
    ```
+   Host → container port mappings:
+   - `localhost:15432` → Postgres `5432`
+   - `localhost:16379` → Redis `6379`
+   - `localhost:18000` → Django web `8000`
 
 ---
 
@@ -114,7 +118,7 @@ gtfs-rt-pipeline/
 ## 🔍 Inspecting Data
 
 **Django Admin**  
-Ensure `docker compose up -d web` is running, then visit `http://localhost:8000/admin`.  
+Ensure `docker compose up -d web` is running, then visit `http://localhost:18000/admin` (container port 8000 is mapped to host 18000).  
 Need a shell inside the container?
 ```bash
 docker compose exec web python manage.py shell
