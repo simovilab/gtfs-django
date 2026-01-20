@@ -55,13 +55,15 @@ gtfs-rt-pipeline/
    # --- Django ---
    DJANGO_SECRET_KEY=change-me
    DJANGO_DEBUG=True
-   DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+   DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,web
    
    # --- Postgres ---
-   DATABASE_URL=postgresql://gtfs:gtfs@localhost:5432/gtfs
+   DATABASE_URL=postgresql://gtfs:gtfs@postgres:5432/gtfs   # use service name inside Docker compose
+   # For local tooling outside Docker override to postgresql://gtfs:gtfs@localhost:15432/gtfs
    
    # --- Redis (Celery broker/backend) ---
-   REDIS_URL=redis://localhost:6379/0
+   REDIS_URL=redis://redis:6379/0
+   # For local tooling override to redis://localhost:16379/0
    
    # --- Feed config ---
    FEED_NAME=mbta
