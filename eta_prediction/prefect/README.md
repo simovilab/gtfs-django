@@ -180,3 +180,178 @@ artifacts.
   uv sync --python 3.12  # or any installed 3.11/3.12/3.13 interpreter
   ```
   Then re-run `uv run python prefect_eta_flow.py ...`.
+
+---
+
+## MLOps Flows
+
+The `flows/` directory contains Prefect flows for the full MLOps lifecycle:
+
+### Training Flow (`flows/training_flow.py`)
+Trains all ETA prediction models on a specified dataset.
+
+```bash
+# Run via deployment
+prefect deployment run 'model-training/model-training' \
+  --param dataset_name=various_dataset_5 \
+  --param by_route=false \
+  --param save_models=true
+
+# Or run directly
+uv run python flows/training_flow.py
+```
+
+**Parameters:**
+- `dataset_name`: Dataset to train on (default: `various_dataset_5`)
+- `by_route`: Train per-route models (default: `false`)
+- `model_types`: List of models to train (default: all)
+- `save_models`: Save to registry (default: `true`)
+- `notification_blocks`: Notification blocks for alerts
+
+### Dataset Build Flow (`flows/dataset_flow.py`)
+Builds training datasets from telemetry and GTFS data.
+
+```bash
+prefect deployment run 'dataset-build/dataset-build' \
+  --param output_name=my_dataset \
+  --param days_back=7
+```
+
+**Parameters:**
+- `output_name`: Base name for output parquet file
+- `days_back`: Days of data to include
+- `route_ids`: Routes to include (None = all)
+- `attach_weather`: Fetch weather features
+- `seed_redis`: Seed Redis caches after building
+
+### Evaluation Flow (`flows/evaluation_flow.py`)
+Compares all models in the registry and identifies promotion candidates.
+
+```bash
+prefect deployment run 'model-evaluation/model-evaluation' \
+  --param metric=test_mae_seconds
+```
+
+**Parameters:**
+- `metric`: Metric for comparison (default: `test_mae_seconds`)
+- `minimize`: Minimize metric (default: `true`)
+- `current_active_model`: Current model for comparison
+
+### Promotion Flow (`flows/promotion_flow.py`)
+Promotes a model to production by updating runtime configuration.
+
+```bash
+prefect deployment run 'model-promotion/model-promotion' \
+  --param model_key=xgboost_... \
+  --param update_runtime_block=true
+```
+
+**Parameters:**
+- `model_key`: Model to promote (required)
+- `update_runtime_block`: Update EtaRuntimeSettings block
+- `runtime_block_name`: Block to update
+- `warm_cache`: Pre-load model after promotion
+
+### Registry Health Flow (`flows/registry_flow.py`)
+Validates registry integrity and handles model archival.
+
+```bash
+prefect deployment run 'registry-health-check/registry-health-check' \
+  --param check_stale=true \
+  --param max_age_days=90
+```
+
+**Parameters:**
+- `check_stale`: Identify old models
+- `max_age_days`: Age threshold for staleness
+- `archive_stale`: Archive stale models
+- `fail_on_errors`: Fail flow on validation errors
+
+---
+
+## Docker Compose Quick Start
+
+The easiest way to run the ETA runtime flow on Docker:
+
+```bash
+# From the project root (eta_prediction/)
+
+# 1. Start Prefect server + Redis
+docker compose -f docker-compose.prefect.yml up -d prefect-server redis
+
+# 2. Run one-time setup (registers blocks, creates work pool, deploys flow)
+docker compose -f docker-compose.prefect.yml run --rm prefect-init
+
+# 3. Start the worker
+docker compose -f docker-compose.prefect.yml up -d eta-worker
+
+# 4. Access Prefect UI at http://localhost:4200
+#    - Go to Deployments -> eta-runtime -> Quick Run to trigger a flow run
+#    - Or use CLI:
+docker compose -f docker-compose.prefect.yml exec eta-worker \
+  prefect deployment run 'prefect-eta-runtime/eta-runtime'
+```
+
+### Services
+
+| Service | Description | Port |
+|---------|-------------|------|
+| `prefect-server` | Prefect API + UI | 4200 |
+| `redis` | Redis for vehicle data | 6380 (external) / 6379 (internal) |
+| `prefect-init` | One-time setup (run once) | - |
+| `eta-worker` | Runtime flow worker | - |
+
+### Checking Logs
+
+```bash
+# Worker logs
+docker compose -f docker-compose.prefect.yml logs -f eta-worker
+
+# All services
+docker compose -f docker-compose.prefect.yml logs -f
+```
+
+### Running Flows
+
+After setup, trigger flows from the Prefect UI (http://localhost:4200) or CLI:
+
+```bash
+# Inside the worker container
+docker compose -f docker-compose.prefect.yml exec eta-worker \
+  prefect deployment run 'prefect-eta-runtime/eta-runtime'
+
+# With parameters (e.g., limited iterations for testing)
+docker compose -f docker-compose.prefect.yml exec eta-worker \
+  prefect deployment run 'prefect-eta-runtime/eta-runtime' \
+  --param iterations=5
+```
+
+### Stopping Everything
+
+```bash
+docker compose -f docker-compose.prefect.yml down
+
+# To also remove volumes (will lose Prefect state and Redis data)
+docker compose -f docker-compose.prefect.yml down -v
+```
+
+---
+
+## Declarative Deployments (prefect.yaml)
+
+All flows are defined in `prefect.yaml` for declarative management:
+
+```bash
+# Deploy all flows
+cd prefect
+prefect deploy --all
+
+# Deploy specific flow
+prefect deploy -n eta-runtime
+
+# List deployments
+prefect deployment ls
+```
+
+Schedules are defined in `prefect.yaml` but disabled by default. Enable by
+setting `active: true` in the schedule configuration.

@@ -24,6 +24,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import redis
 
+
 # Import the Prefect library before we add the local `prefect/` directory to
 # sys.path (to avoid shadowing the real package via namespace packages).
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -281,8 +282,10 @@ def _publish_profiling_artifacts(config: RedisPipelineConfig, logger: Any) -> No
             logger.warning("Unable to read profiling CSV %s: %s", path, exc)
             continue
         try:
+            # Artifact keys only allow lowercase letters, numbers, and dashes
+            artifact_key = f"{prefix}-{name}".replace("_", "-")
             create_markdown_artifact(
-                key=f"{prefix}-{name}",
+                key=artifact_key,
                 description=f"Prefect ETA runtime profiling data for {name}.",
                 markdown=f"### {name}\n\n```csv\n{csv_content}\n```",
             )

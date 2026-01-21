@@ -1,0 +1,115 @@
+# Docker Compose for Prefect ETA Runtime
+#
+# Usage:
+#   1. Start server and Redis:
+#      docker compose -f docker-compose.prefect.yml up -d prefect-server redis
+#
+#   2. Run setup (registers blocks, creates work pool, deploys flow):
+#      docker compose -f docker-compose.prefect.yml run --rm prefect-init
+#
+#   3. Start the worker:
+#      docker compose -f docker-compose.prefect.yml up -d eta-worker
+#
+#   4. Trigger a flow run (from Prefect UI at http://localhost:4200 or CLI):
+#      docker compose -f docker-compose.prefect.yml exec eta-worker \
+#        prefect deployment run 'prefect-eta-runtime/eta-runtime'
+#
+# To see logs:
+#   docker compose -f docker-compose.prefect.yml logs -f eta-worker
+
+services:
+  # Prefect Server (API + UI)
+  prefect-server:
+    image: prefecthq/prefect:3-python3.12
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      PREFECT_API_URL: http://localhost:4200/api
+      PREFECT_UI_API_URL: http://localhost:4200/api
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+    volumes:
+      - prefect-data:/root/.prefect
+    networks:
+      - eta-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:4200/api/health').raise_for_status()"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - eta-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # One-time setup: register blocks, create work pool, deploy flows
+  prefect-init:
+    build:
+      context: .
+      dockerfile: prefect/Dockerfile
+    command:
+      - python
+      - /app/prefect/setup_prefect.py
+      - --api-url=http://prefect-server:4200/api
+      - --redis-host=redis
+      - --redis-port=6379
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      MODEL_REGISTRY_DIR: /app/models/trained
+    volumes:
+      - .:/app
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - eta-network
+
+  # ETA Runtime Worker
+  eta-worker:
+    build:
+      context: .
+      dockerfile: prefect/Dockerfile
+    command:
+      - bash
+      - -c
+      - |
+        prefect config set PREFECT_API_URL=http://prefect-server:4200/api
+        prefect worker start --pool eta-runtime-pool --name eta-worker-1
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      MODEL_REGISTRY_DIR: /app/models/trained
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    volumes:
+      - .:/app
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - eta-network
+    restart: unless-stopped
+
+volumes:
+  prefect-data:
+  redis-data:
+
+networks:
+  eta-network:
+    driver: bridge

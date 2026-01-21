@@ -1,0 +1,178 @@
+# Prefect deployment configuration for ETA prediction flows
+# https://docs.prefect.io/latest/concepts/deployments/
+
+name: eta-prediction
+prefect-version: 3.0.0
+
+# Build section - how to package code for deployment
+build: null  # Using local filesystem, no build step needed
+
+# Push section - where to store deployment artifacts
+push: null  # Local deployments
+
+# Pull section - how workers retrieve code
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /app/prefect
+
+# Deployment definitions
+deployments:
+  # =========================================================================
+  # Runtime ETA Streaming Flow
+  # =========================================================================
+  - name: eta-runtime
+    description: |
+      Continuously polls Redis for vehicle snapshots, runs ETA inference,
+      and writes predictions back to Redis. Mirrors the Bytewax pipeline
+      but runs anywhere Prefect agents are deployed.
+    entrypoint: prefect_eta_flow.py:prefect_eta_runtime
+    tags:
+      - eta
+      - runtime
+      - streaming
+    parameters:
+      runtime_settings_block: eta-runtime-default
+      iterations: 0  # 0 = run forever
+    work_pool:
+      name: eta-runtime-pool
+      work_queue_name: default
+    schedules: []  # Long-running, started manually or via API
+
+  # =========================================================================
+  # Runtime Flow - Development/Testing variant
+  # =========================================================================
+  - name: eta-runtime-dev
+    description: |
+      Development variant that runs a limited number of iterations for testing.
+    entrypoint: prefect_eta_flow.py:prefect_eta_runtime
+    tags:
+      - eta
+      - runtime
+      - dev
+    parameters:
+      runtime_settings_block: eta-runtime-dev
+      iterations: 10
+      poll_interval_seconds: 2.0
+    work_pool:
+      name: eta-runtime-pool
+      work_queue_name: dev
+
+  # =========================================================================
+  # Model Training Flow
+  # =========================================================================
+  - name: model-training
+    description: |
+      Trains all ETA prediction models (historical_mean, ewma, polyreg, xgboost)
+      on the specified dataset. Can train globally or per-route.
+    entrypoint: flows/training_flow.py:training_flow
+    tags:
+      - eta
+      - training
+      - mlops
+    parameters:
+      dataset_name: various_dataset_5
+      by_route: false
+      model_types:
+        - historical_mean
+        - ewma
+        - polyreg_distance
+        - polyreg_time
+        - xgboost
+      save_models: true
+      notification_blocks: []
+    work_pool:
+      name: eta-training-pool
+      work_queue_name: default
+    schedules:
+      - cron: "0 2 * * 0"  # Weekly at 2 AM Sunday
+        timezone: America/Los_Angeles
+        active: false  # Enable when ready
+
+  # =========================================================================
+  # Dataset Build Flow
+  # =========================================================================
+  - name: dataset-build
+    description: |
+      Builds training datasets from raw telemetry and GTFS data.
+      Runs feature engineering and outputs parquet files.
+    entrypoint: flows/dataset_flow.py:dataset_build_flow
+    tags:
+      - eta
+      - dataset
+      - mlops
+    parameters:
+      output_name: various_dataset
+      gtfs_path: null  # Uses default from Block
+      telemetry_source: null  # Uses default from Block
+      notification_blocks: []
+    work_pool:
+      name: eta-training-pool
+      work_queue_name: default
+    schedules:
+      - cron: "0 0 * * 0"  # Weekly at midnight Sunday (before training)
+        timezone: America/Los_Angeles
+        active: false
+
+  # =========================================================================
+  # Model Evaluation Flow
+  # =========================================================================
+  - name: model-evaluation
+    description: |
+      Evaluates all registered models, compares performance, and identifies
+      promotion candidates based on configurable metrics.
+    entrypoint: flows/evaluation_flow.py:evaluation_flow
+    tags:
+      - eta
+      - evaluation
+      - mlops
+    parameters:
+      metric: test_mae_seconds
+      minimize: true
+      notification_blocks: []
+    work_pool:
+      name: eta-training-pool
+      work_queue_name: default
+
+  # =========================================================================
+  # Model Promotion Flow
+  # =========================================================================
+  - name: model-promotion
+    description: |
+      Promotes a specific model to be the active model used by the runtime.
+      Updates configuration and optionally triggers runtime reload.
+    entrypoint: flows/promotion_flow.py:promotion_flow
+    tags:
+      - eta
+      - promotion
+      - mlops
+    parameters:
+      model_key: null  # Required: model to promote
+      update_runtime_block: true
+      runtime_block_name: eta-runtime-default
+      notification_blocks: []
+    work_pool:
+      name: eta-training-pool
+      work_queue_name: default
+
+  # =========================================================================
+  # Registry Health Check Flow
+  # =========================================================================
+  - name: registry-health-check
+    description: |
+      Validates model registry integrity - checks that all registered models
+      have matching .pkl and _meta.json files with valid schemas.
+    entrypoint: flows/registry_flow.py:registry_health_flow
+    tags:
+      - eta
+      - registry
+      - maintenance
+    parameters:
+      notification_blocks: []
+      fail_on_errors: false
+    work_pool:
+      name: eta-training-pool
+      work_queue_name: default
+    schedules:
+      - cron: "0 6 * * *"  # Daily at 6 AM
+        timezone: America/Los_Angeles
+        active: false
