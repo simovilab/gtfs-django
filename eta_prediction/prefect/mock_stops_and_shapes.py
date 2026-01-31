@@ -279,12 +279,12 @@ if __name__ == "__main__":
     try:
         client = redis.Redis(
             host="localhost",
-            port=6379,
+            port=6380,
             db=0,
             decode_responses=True
         )
         client.ping()
-        print("✓ Connected to Redis at localhost:6379\n")
+        print("✓ Connected to Redis at localhost:6380\n")
         
         stops_count, shapes_count = load_all_to_redis(client)
         
