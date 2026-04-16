@@ -52,9 +52,7 @@ dev = [
     "twine>=6.2.0",
 ]
 docs = [
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.6.20",
-    "mkdocstrings[python]>=0.30.0",
+    "zensical>=0.0.33",
 ]
 testing = [
     "coverage[toml]>=7.10.6",
