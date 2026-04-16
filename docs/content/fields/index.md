@@ -1,6 +1,5 @@
 ---
 icon: lucide/list-checks
-status: new
 ---
 
 # Django Fields for GTFS Types

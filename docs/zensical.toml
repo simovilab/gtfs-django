@@ -217,7 +217,7 @@ features = [
   # When tabs are enabled, top-level sections are rendered in a menu layer
   # below the header for viewports above 1220px, but remain as-is on mobile.
   # https://zensical.org/docs/setup/navigation/#navigation-tabs
-  #"navigation.tabs",
+  # "navigation.tabs",
 
   # When sticky tabs are enabled, navigation tabs will lock below the header
   # and always remain visible when scrolling down.
@@ -312,6 +312,19 @@ link = "https://instagram.com/simovilab"
 
 [project.extra.status]
 new = "Recently added"
+
+# ----------------------------------------------------------------------------
+# The "plugins" section contains plugins to extend functionality.
+# ----------------------------------------------------------------------------
+
+[project.plugins.mkdocstrings.handlers.python]
+inventories = ["https://docs.python.org/3/objects.inv"]
+paths = ["../gtfs"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+inherited_members = true
+show_source = true
 
 # ----------------------------------------------------------------------------
 # In this section you can configure the Markdown extensions that are used when

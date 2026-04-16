@@ -37,5 +37,8 @@ dev = [
     "pytest-django>=4.11.1",
     "ruff>=0.13.0",
 ]
-docs = ["zensical>=0.0.33"]
+docs = [
+    "mkdocstrings-python>=2.0.3",
+    "zensical>=0.0.33",
+]
 testing = ["coverage[toml]>=7.10.6", "tox>=4.30.2"]

@@ -1,26 +1,41 @@
-from .stop_times import estimate_stop_times
+import requests
 
 
-def build_vehicle_positions():
-    return "One day, vehicle_positions.pb"
+def example_realtime_status(
+    url: str,
+    timeout: float = 10.0,
+    headers: dict[str, str] | None = None,
+    include_alerts: bool = False,
+) -> dict[str, str]:
+    """Returns a placeholder status for a GTFS Realtime endpoint.
 
+    This function exists only to validate documentation generation.
 
-def build_trip_updates():
-    estimate_stop_times()
-    return "One day, trip_updates.pb"
+    Args:
+        url (str): The endpoint to check.
+        timeout (float): Request timeout in seconds.
+        headers (dict[str, str] | None): Optional request headers.
+        include_alerts (bool): Whether to include service alerts.
 
+    Returns:
+        dict[str, str]: A placeholder status payload.
 
-def build_alerts():
-    return "One day, alerts.pb"
+    Raises:
+        NotImplementedError: Always raised because this is a documentation stub.
 
+    warning: Important
+        This function is intentionally non-functional and should be replaced
+        with a real implementation when needed.
 
-def get_vehicle_positions():
-    return "Saved vehicle positions"
-
-
-def get_trip_updates():
-    return "Saved trip updates"
-
-
-def get_alerts():
-    return "Saved alerts"
+    Examples:
+        >>> example_realtime_status("https://example.com/gtfs-realtime")
+        {'status': 'not_implemented'}
+        >>> example_realtime_status(
+        ...     "https://example.com/gtfs-realtime",
+        ...     timeout=2.5,
+        ...     headers={"Authorization": "Bearer demo"},
+        ...     include_alerts=True,
+        ... )
+        {'status': 'not_implemented'}
+    """
+    raise NotImplementedError("Example stub for documentation tests.")
