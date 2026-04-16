@@ -305,9 +305,13 @@ toggle.name = "Switch to light mode"
 [[project.extra.social]]
 icon = "fontawesome/brands/github"
 link = "https://github.com/simovilab/gtfs-django"
+
 [[project.extra.social]]
 icon = "fontawesome/brands/instagram"
 link = "https://instagram.com/simovilab"
+
+[project.extra.status]
+new = "Recently added"
 
 # ----------------------------------------------------------------------------
 # In this section you can configure the Markdown extensions that are used when
