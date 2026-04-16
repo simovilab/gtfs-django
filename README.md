@@ -5,204 +5,149 @@
 [![Django versions](https://img.shields.io/pypi/frameworkversions/django/gtfs-django.svg)](https://pypi.org/project/gtfs-django/)
 [![License](https://img.shields.io/pypi/l/gtfs-django.svg)](https://github.com/simovilab/gtfs-django/blob/main/LICENSE)
 
-A Django app for processing and managing GTFS (General Transit Feed Specification) data, including support for both static schedule data and real-time feeds.
+A Django package that provides **abstract models** for [GTFS](https://gtfs.org/) (General Transit Feed Specification) data, covering both static *Schedule* feeds and dynamic *Realtime* feed messages.
 
-## Features
+Because all models are abstract, this package creates no database tables of its own. You subclass the models in your own Django app, giving you full control over your schema — adding foreign keys, extra fields, constraints, or any other customisations your project requires.
 
-- **GTFS Schedule Support**: Complete support for GTFS static data including agencies, routes, trips, stops, and schedules
-- **GTFS Realtime Support**: Process GTFS-RT feeds for trip updates, vehicle positions, and service alerts
-- **GeoDjango Integration**: Built-in geographic capabilities for spatial queries and mapping
-- **Composite Primary Keys**: Uses Django 5.2+ composite primary key features for optimal GTFS data modeling
-- **Provider Management**: Multi-provider support for managing multiple transit agencies
-- **Admin Interface**: Django admin integration for easy data management
+The package `gtfs-django` also includes custom Django model fields that handle GTFS-specific data types and formats, such as time fields that support hours greater than 24, geographic coordinate fields, and validated fields for color codes, language tags, and more.
+
+Finally, `gtfs-django` provides utilities for importing GTFS data from ZIP files, parsing GTFS Realtime protobuf messages, and validating GTFS feed contents against the specification.
 
 ## Requirements
 
 - **Python**: 3.12+
-- **Django**: 5.2.0+ (required for composite primary key support)
-- **PostGIS**: Recommended for production GeoDjango features
+- **Django**: 5.2+
+
+## Installation
+
+```bash
+pip install gtfs-django
+```
+
+```bash
+uv add gtfs-django
+```
 
 ## Quick Start
 
-### 1. Install the package
-
-```bash
-# Basic installation
-pip install gtfs-django
-
-# With PostgreSQL support
-pip install gtfs-django[postgresql]
-```
-
-### 2. Add to Django settings
+### 1. Add to your Django settings
 
 ```python
 INSTALLED_APPS = [
-    # ... your other apps
-    'django.contrib.gis',  # Required for GeoDjango features
-    'gtfs',
+    # ...
+    "gtfs",
 ]
-
-# Database configuration with PostGIS (recommended)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'your_db_name',
-        'USER': 'your_db_user',
-        'PASSWORD': 'your_db_password',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
 ```
 
-### 3. Run migrations
+### 2. Subclass the abstract models in your app
+
+Add auxiliary tables or new fields as needed.
+
+```python
+from django.db import models
+from gtfs.models import BaseAgency, BaseRoute, BaseTrip, BaseStop, BaseStopTime
+
+
+class Feed(models.Model):
+    """Represents a versioned GTFS feed download."""
+    name = models.CharField(max_length=255)
+    downloaded_at = models.DateTimeField(auto_now_add=True)
+
+
+class Agency(BaseAgency):
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+
+
+class Route(BaseRoute):
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+    agency = models.ForeignKey(Agency, on_delete=models.CASCADE)
+
+
+class Trip(BaseTrip):
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+
+
+class Stop(BaseStop):
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+
+
+class StopTime(BaseStopTime):
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+```
+
+### 3. Run migrations for your app
 
 ```bash
+python manage.py makemigrations <your_app_name>
 python manage.py migrate
 ```
 
-### 4. Create a GTFS provider
+## Abstract Models
 
-```python
-from gtfs.models import GTFSProvider
+### GTFS Schedule
 
-provider = GTFSProvider.objects.create(
-    code='metro',
-    name='Metropolitan Transit Authority',
-    timezone='America/New_York',
-    schedule_url='https://example.com/gtfs.zip',
-    is_active=True
-)
-```
+| Model | GTFS file | Description |
+|---|---|---|
+| `BaseAgency` | `agency.txt` | Transit agencies |
+| `BaseStop` | `stops.txt` | Stops and stations |
+| `BaseRoute` | `routes.txt` | Routes |
+| `BaseTrip` | `trips.txt` | Trips |
+| `BaseStopTime` | `stop_times.txt` | Arrival/departure times per stop |
+| `BaseCalendar` | `calendar.txt` | Weekly service schedules |
+| `BaseCalendarDate` | `calendar_dates.txt` | Service exceptions |
+| `BaseShape` | `shapes.txt` | Route shapes |
+| `BaseFareAttribute` | `fare_attributes.txt` | Fare definitions |
+| `BaseFareRule` | `fare_rules.txt` | Fare applicability rules |
+| `BaseFeedInfo` | `feed_info.txt` | Feed metadata |
 
-## Models Overview
+### GTFS Realtime
 
-### Core GTFS Schedule Models
+| Model | Description |
+|---|---|
+| `BaseFeedMessage` | Feed message header |
+| `BaseTripUpdate` | Real-time trip schedule updates |
+| `BaseStopTimeUpdate` | Per-stop arrival/departure updates |
+| `BaseVehiclePosition` | Live vehicle locations |
+| `BaseAlert` | Service alerts and disruptions |
 
-- **`Feed`**: Represents a GTFS feed with metadata
-- **`Agency`**: Transit agencies providing services
-- **`Route`**: Transit routes with service patterns
-- **`Trip`**: Individual trips on routes
-- **`Stop`**: Physical stops where vehicles pick up/drop off passengers
-- **`StopTime`**: Scheduled times for stops on trips
-- **`Calendar`** & **`CalendarDate`**: Service calendars and exceptions
+## Custom Fields
 
-### GeoDjango Models
+`gtfs.fields` provides Django model fields that encode GTFS type semantics:
 
-- **`GeoShape`**: Route shapes with LineString geometries
-- **`Stop`**: Includes PointField for precise geographic locations
+| Field | GTFS type | Notes |
+|---|---|---|
+| `ColorField` | `Color` | 6-digit hex, without `#` |
+| `CurrencyCodeField` | `Currency code` | ISO 4217, e.g. `USD` |
+| `CurrencyAmountField` | `Currency amount` | Decimal |
+| `ServiceDateField` | `Date` | Accepts/serialises `YYYYMMDD` |
+| `GTFSTimeField` | `Time` | `timedelta`; supports hours ≥ 24 |
+| `GTFSLocalTimeField` | `Local time` | String `HH:MM:SS`; hours 0–23 |
+| `GTFSIDField` | `ID` | CharField, optionally ASCII-only |
+| `GTFSTextField` | `Text` | CharField with 255-char default |
+| `GTFSTimezoneField` | `Timezone` | Validated IANA timezone name |
+| `LanguageCodeField` | `Language code` | BCP 47 tag, e.g. `en-US` |
+| `LatitudeField` | `Latitude` | Decimal, −90 to 90 |
+| `LongitudeField` | `Longitude` | Decimal, −180 to 180 |
+| `PhoneNumberField` | `Phone number` | Permissive international format |
+| `EnumIntegerField` | `Enum` | Integer with required `choices` |
+| `EnumCharField` | `Enum` | String with required `choices` |
 
-### GTFS Realtime Models
-
-- **`FeedMessage`**: GTFS-RT feed message headers
-- **`TripUpdate`**: Real-time trip schedule updates
-- **`VehiclePosition`**: Live vehicle location data
-- **`Alert`**: Service alerts and disruptions
-
-## Usage Examples
-
-### Working with GTFS Schedule Data
-
-```python
-from gtfs.models import Agency, Route, Trip, Stop
-
-# Get all agencies
-agencies = Agency.objects.all()
-
-# Find routes by type
-bus_routes = Route.objects.filter(route_type=3)  # 3 = Bus
-
-# Get stops within a geographic area (requires PostGIS)
-from django.contrib.gis.geos import Point
-from django.contrib.gis.measure import Distance
-
-center = Point(-122.4194, 37.7749)  # San Francisco
-nearby_stops = Stop.objects.filter(
-    stop_point__distance_lte=(center, Distance(km=1))
-)
-```
-
-### Processing GTFS Realtime Data
-
-```python
-from gtfs.models import VehiclePosition, TripUpdate
-
-# Get recent vehicle positions
-recent_positions = VehiclePosition.objects.filter(
-    vehicle_timestamp__gte=timezone.now() - timedelta(minutes=5)
-)
-
-# Check for service alerts
-from gtfs.models import Alert
-active_alerts = Alert.objects.filter(
-    published__lte=timezone.now(),
-    # Add your alert filtering logic
-)
-```
-
-## Advanced Features
-
-### Composite Primary Keys
-
-This package takes advantage of Django 5.2's composite primary key support for optimal GTFS data modeling:
-
-```python
-class StopTime(models.Model):
-    # Uses composite primary key for (feed, trip_id, stop_sequence)
-    class Meta:
-        constraints = [
-            UniqueConstraint(
-                fields=["feed", "trip_id", "stop_sequence"],
-                name="unique_stoptime_in_feed",
-            )
-        ]
-```
-
-### Geographic Queries
-
-With PostGIS backend, you can perform sophisticated spatial queries:
-
-```python
-from django.contrib.gis.db.models import Q
-from django.contrib.gis.geos import Polygon
-
-# Find all stops within a polygon area
-area = Polygon(...) # Define your polygon
-stops_in_area = Stop.objects.filter(stop_point__within=area)
-
-# Find nearest stops to a point
-from django.contrib.gis.db.models.functions import Distance
-
-nearest_stops = Stop.objects.annotate(
-    distance=Distance('stop_point', center_point)
-).order_by('distance')[:5]
-```
-
-## Development Setup
-
-For development work on this package:
+## Development
 
 ```bash
-# Clone the repository
 git clone https://github.com/simovilab/gtfs-django.git
 cd gtfs-django
 
-# Install development dependencies
-pip install -e .[dev]
+# Install with development dependencies
+uv sync
 
 # Run tests
 pytest
-
-# Run with GeoDjango tests (requires PostGIS)
-USE_GIS=1 pytest
 ```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-### Development Guidelines
+Contributions are welcome. For major changes please open an issue first.
 
 1. Follow Django coding standards
 2. Add tests for new features
@@ -211,18 +156,12 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
 ## Credits
 
-Developed by [Simovi Lab](https://github.com/simovilab) for processing and managing GTFS transit data in Django applications.
-
-## Related Projects
-
-- [GTFS-to](https://github.com/BlinkTagInc/gtfs-to-geojson) - Convert GTFS to various formats
-- [Transitland](https://www.transit.land/) - Open transit data platform
-- [OpenTripPlanner](http://www.opentripplanner.org/) - Multimodal trip planning software
+Developed by [SIMOVI Lab](https://github.com/simovilab).
 
 ---
 
-For more information about GTFS, visit the [General Transit Feed Specification](https://gtfs.org/) website.
+For more information about GTFS, visit [gtfs.org](https://gtfs.org/).
