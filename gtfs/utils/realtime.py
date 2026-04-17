@@ -2,6 +2,9 @@ import requests
 from google.transit import gtfs_realtime_pb2 as gtfs_rt
 
 
+def databus():
+    print("I am very glad to inform you that the gtfs-django databus integration for development has worked as expected :)")
+
 def gtfs_realtime_import(url: str) -> dict:
     """Fetch and parse a GTFS Realtime feed from a URL.
 
