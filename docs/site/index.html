@@ -1399,7 +1399,7 @@
                   
 
 <h1 id="gtfs-django">gtfs-django<a class="headerlink" href="#gtfs-django" title="Permanent link">&para;</a></h1>
-<p>A Django app that provides <strong>abstract models</strong>, <strong>custom fields</strong> and <strong>utility functions</strong> for <a href="https://gtfs.org/">GTFS</a> (General Transit Feed Specification) data, covering both static <em>Schedule</em> feeds and dynamic <em>Realtime</em> feed messages.</p>
+<p><code>gtfs-django</code> is a Django app that provides <strong>abstract models</strong>, <strong>custom fields</strong> and <strong>utility functions</strong> for <a href="https://gtfs.org/">GTFS</a> (General Transit Feed Specification) data, covering both static <em>Schedule</em> feeds and dynamic <em>Realtime</em> feed messages.</p>
 <p>Because all models are abstract, this package creates no database tables of its own. You subclass the models in your own Django app, giving you full control over your schema — adding foreign keys, extra fields, constraints, or any other customisations your project requires.</p>
 <p>The package <code>gtfs-django</code> also includes custom Django model fields that handle GTFS-specific data types and formats, such as time fields that support hours greater than 24, geographic coordinate fields, and validated fields for color codes, language tags, and more.</p>
 <p>Finally, <code>gtfs-django</code> provides utilities for importing GTFS data from ZIP files, parsing GTFS Realtime protobuf messages, and validating GTFS feed contents against the specification.</p>

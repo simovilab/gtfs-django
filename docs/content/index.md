@@ -4,7 +4,7 @@ icon: lucide/rocket
 
 # gtfs-django
 
-A Django app that provides **abstract models**, **custom fields** and **utility functions** for [GTFS](https://gtfs.org/) (General Transit Feed Specification) data, covering both static *Schedule* feeds and dynamic *Realtime* feed messages.
+`gtfs-django` is a Django app that provides **abstract models**, **custom fields** and **utility functions** for [GTFS](https://gtfs.org/) (General Transit Feed Specification) data, covering both static *Schedule* feeds and dynamic *Realtime* feed messages.
 
 Because all models are abstract, this package creates no database tables of its own. You subclass the models in your own Django app, giving you full control over your schema — adding foreign keys, extra fields, constraints, or any other customisations your project requires.
 
