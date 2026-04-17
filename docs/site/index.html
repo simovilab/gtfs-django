@@ -25,7 +25,7 @@
     
     
       
-        <title>Installation - GTFS Utilities for Django</title>
+        <title>gtfs-django - GTFS Utilities for Django</title>
       
     
     
@@ -81,7 +81,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#gtfs-django" class="md-skip">
           Skip to content
         </a>
       
@@ -117,7 +117,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              gtfs-django
             
           </span>
         </div>
@@ -223,6 +223,26 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-rocket" viewBox="0 0 24 24"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    gtfs-django
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="" class="md-nav__link md-nav__link--active">
         
   
@@ -232,7 +252,7 @@
   <span class="md-ellipsis">
     
   
-    Installation
+    gtfs-django
   
 
     
@@ -241,6 +261,192 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-add-to-your-django-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Add to your Django settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-subclass-the-abstract-models-in-your-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Subclass the abstract models in your app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-run-migrations-for-your-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Run migrations for your app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#abstract-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Abstract Models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Abstract Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gtfs-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GTFS Schedule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gtfs-realtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GTFS Realtime
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        License
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#credits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credits
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -980,6 +1186,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -991,6 +1202,180 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-add-to-your-django-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Add to your Django settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-subclass-the-abstract-models-in-your-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Subclass the abstract models in your app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-run-migrations-for-your-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Run migrations for your app
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#abstract-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Abstract Models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Abstract Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gtfs-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GTFS Schedule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gtfs-realtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GTFS Realtime
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#license" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        License
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#credits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credits
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1013,7 +1398,283 @@
                 
                   
 
-<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
+<h1 id="gtfs-django">gtfs-django<a class="headerlink" href="#gtfs-django" title="Permanent link">&para;</a></h1>
+<p>A Django app that provides <strong>abstract models</strong>, <strong>custom fields</strong> and <strong>utility functions</strong> for <a href="https://gtfs.org/">GTFS</a> (General Transit Feed Specification) data, covering both static <em>Schedule</em> feeds and dynamic <em>Realtime</em> feed messages.</p>
+<p>Because all models are abstract, this package creates no database tables of its own. You subclass the models in your own Django app, giving you full control over your schema — adding foreign keys, extra fields, constraints, or any other customisations your project requires.</p>
+<p>The package <code>gtfs-django</code> also includes custom Django model fields that handle GTFS-specific data types and formats, such as time fields that support hours greater than 24, geographic coordinate fields, and validated fields for color codes, language tags, and more.</p>
+<p>Finally, <code>gtfs-django</code> provides utilities for importing GTFS data from ZIP files, parsing GTFS Realtime protobuf messages, and validating GTFS feed contents against the specification.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Python</strong>: 3.12+</li>
+<li><strong>Django</strong>: 5.2+</li>
+</ul>
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">uv</label><label for="__tabbed_1_2">pip</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-c highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">uv</span><span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="n">gtfs</span><span class="o">-</span><span class="n">django</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-c++ highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">gtfs</span><span class="o">-</span><span class="n">django</span>
+</span></code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<h3 id="1-add-to-your-django-settings">1. Add to your Django settings<a class="headerlink" href="#1-add-to-your-django-settings" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">INSTALLED_APPS</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="c1"># ...</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="s2">&quot;gtfs&quot;</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">]</span>
+</span></code></pre></div>
+<h3 id="2-subclass-the-abstract-models-in-your-app">2. Subclass the abstract models in your app<a class="headerlink" href="#2-subclass-the-abstract-models-in-your-app" title="Permanent link">&para;</a></h3>
+<p>Add auxiliary tables or new fields as needed.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.db</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">gtfs.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseAgency</span><span class="p">,</span> <span class="n">BaseRoute</span><span class="p">,</span> <span class="n">BaseTrip</span><span class="p">,</span> <span class="n">BaseStop</span><span class="p">,</span> <span class="n">BaseStopTime</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">Feed</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents a versioned GTFS feed download.&quot;&quot;&quot;</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">name</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">255</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">downloaded_at</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">DateTimeField</span><span class="p">(</span><span class="n">auto_now_add</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="k">class</span><span class="w"> </span><span class="nc">Agency</span><span class="p">(</span><span class="n">BaseAgency</span><span class="p">):</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">feed</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">Feed</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">)</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="k">class</span><span class="w"> </span><span class="nc">Route</span><span class="p">(</span><span class="n">BaseRoute</span><span class="p">):</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="n">feed</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">Feed</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">)</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="n">agency</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">Agency</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">)</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="k">class</span><span class="w"> </span><span class="nc">Trip</span><span class="p">(</span><span class="n">BaseTrip</span><span class="p">):</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="n">feed</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">Feed</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">)</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="k">class</span><span class="w"> </span><span class="nc">Stop</span><span class="p">(</span><span class="n">BaseStop</span><span class="p">):</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>    <span class="n">feed</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">Feed</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">)</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="k">class</span><span class="w"> </span><span class="nc">StopTime</span><span class="p">(</span><span class="n">BaseStopTime</span><span class="p">):</span>
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    <span class="n">feed</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">ForeignKey</span><span class="p">(</span><span class="n">Feed</span><span class="p">,</span> <span class="n">on_delete</span><span class="o">=</span><span class="n">models</span><span class="o">.</span><span class="n">CASCADE</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="3-run-migrations-for-your-app">3. Run migrations for your app<a class="headerlink" href="#3-run-migrations-for-your-app" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python<span class="w"> </span>manage.py<span class="w"> </span>makemigrations<span class="w"> </span>&lt;your_app_name&gt;
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>python<span class="w"> </span>manage.py<span class="w"> </span>migrate
+</span></code></pre></div>
+<h2 id="abstract-models">Abstract Models<a class="headerlink" href="#abstract-models" title="Permanent link">&para;</a></h2>
+<h3 id="gtfs-schedule">GTFS Schedule<a class="headerlink" href="#gtfs-schedule" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>GTFS file</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BaseAgency</code></td>
+<td><code>agency.txt</code></td>
+<td>Transit agencies</td>
+</tr>
+<tr>
+<td><code>BaseStop</code></td>
+<td><code>stops.txt</code></td>
+<td>Stops and stations</td>
+</tr>
+<tr>
+<td><code>BaseRoute</code></td>
+<td><code>routes.txt</code></td>
+<td>Routes</td>
+</tr>
+<tr>
+<td><code>BaseTrip</code></td>
+<td><code>trips.txt</code></td>
+<td>Trips</td>
+</tr>
+<tr>
+<td><code>BaseStopTime</code></td>
+<td><code>stop_times.txt</code></td>
+<td>Arrival/departure times per stop</td>
+</tr>
+<tr>
+<td><code>BaseCalendar</code></td>
+<td><code>calendar.txt</code></td>
+<td>Weekly service schedules</td>
+</tr>
+<tr>
+<td><code>BaseCalendarDate</code></td>
+<td><code>calendar_dates.txt</code></td>
+<td>Service exceptions</td>
+</tr>
+<tr>
+<td><code>BaseShape</code></td>
+<td><code>shapes.txt</code></td>
+<td>Route shapes</td>
+</tr>
+<tr>
+<td><code>BaseFareAttribute</code></td>
+<td><code>fare_attributes.txt</code></td>
+<td>Fare definitions</td>
+</tr>
+<tr>
+<td><code>BaseFareRule</code></td>
+<td><code>fare_rules.txt</code></td>
+<td>Fare applicability rules</td>
+</tr>
+<tr>
+<td><code>BaseFeedInfo</code></td>
+<td><code>feed_info.txt</code></td>
+<td>Feed metadata</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gtfs-realtime">GTFS Realtime<a class="headerlink" href="#gtfs-realtime" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BaseFeedMessage</code></td>
+<td>Feed message header</td>
+</tr>
+<tr>
+<td><code>BaseTripUpdate</code></td>
+<td>Real-time trip schedule updates</td>
+</tr>
+<tr>
+<td><code>BaseStopTimeUpdate</code></td>
+<td>Per-stop arrival/departure updates</td>
+</tr>
+<tr>
+<td><code>BaseVehiclePosition</code></td>
+<td>Live vehicle locations</td>
+</tr>
+<tr>
+<td><code>BaseAlert</code></td>
+<td>Service alerts and disruptions</td>
+</tr>
+</tbody>
+</table>
+<h2 id="custom-fields">Custom Fields<a class="headerlink" href="#custom-fields" title="Permanent link">&para;</a></h2>
+<p><code>gtfs.fields</code> provides Django model fields that encode GTFS type semantics:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>GTFS type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ColorField</code></td>
+<td><code>Color</code></td>
+<td>6-digit hex, without <code>#</code></td>
+</tr>
+<tr>
+<td><code>CurrencyCodeField</code></td>
+<td><code>Currency code</code></td>
+<td>ISO 4217, e.g. <code>USD</code></td>
+</tr>
+<tr>
+<td><code>CurrencyAmountField</code></td>
+<td><code>Currency amount</code></td>
+<td>Decimal</td>
+</tr>
+<tr>
+<td><code>ServiceDateField</code></td>
+<td><code>Date</code></td>
+<td>Accepts/serialises <code>YYYYMMDD</code></td>
+</tr>
+<tr>
+<td><code>GTFSTimeField</code></td>
+<td><code>Time</code></td>
+<td><code>timedelta</code>; supports hours ≥ 24</td>
+</tr>
+<tr>
+<td><code>GTFSLocalTimeField</code></td>
+<td><code>Local time</code></td>
+<td>String <code>HH:MM:SS</code>; hours 0–23</td>
+</tr>
+<tr>
+<td><code>GTFSIDField</code></td>
+<td><code>ID</code></td>
+<td>CharField, optionally ASCII-only</td>
+</tr>
+<tr>
+<td><code>GTFSTextField</code></td>
+<td><code>Text</code></td>
+<td>CharField with 255-char default</td>
+</tr>
+<tr>
+<td><code>GTFSTimezoneField</code></td>
+<td><code>Timezone</code></td>
+<td>Validated IANA timezone name</td>
+</tr>
+<tr>
+<td><code>LanguageCodeField</code></td>
+<td><code>Language code</code></td>
+<td>BCP 47 tag, e.g. <code>en-US</code></td>
+</tr>
+<tr>
+<td><code>LatitudeField</code></td>
+<td><code>Latitude</code></td>
+<td>Decimal, −90 to 90</td>
+</tr>
+<tr>
+<td><code>LongitudeField</code></td>
+<td><code>Longitude</code></td>
+<td>Decimal, −180 to 180</td>
+</tr>
+<tr>
+<td><code>PhoneNumberField</code></td>
+<td><code>Phone number</code></td>
+<td>Permissive international format</td>
+</tr>
+<tr>
+<td><code>EnumIntegerField</code></td>
+<td><code>Enum</code></td>
+<td>Integer with required <code>choices</code></td>
+</tr>
+<tr>
+<td><code>EnumCharField</code></td>
+<td><code>Enum</code></td>
+<td>String with required <code>choices</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="development">Development<a class="headerlink" href="#development" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/simovilab/gtfs-django.git
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>gtfs-django
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Install with development dependencies</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>uv<span class="w"> </span>sync
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Run tests</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>pytest
+</span></code></pre></div>
+<h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">&para;</a></h2>
+<p>Contributions are welcome. For major changes please open an issue first.</p>
+<ol>
+<li>Follow Django coding standards</li>
+<li>Add tests for new features</li>
+<li>Update documentation as needed</li>
+<li>Ensure compatibility with Django 5.2+</li>
+</ol>
+<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
+<p>Apache License 2.0 — see <a href="LICENSE">LICENSE</a> for details.</p>
+<h2 id="credits">Credits<a class="headerlink" href="#credits" title="Permanent link">&para;</a></h2>
+<p>Developed by <a href="https://github.com/simovilab">SIMOVI Lab</a>.</p>
+<hr />
+<p>For more information about GTFS, visit <a href="https://gtfs.org/">gtfs.org</a>.</p>
 
 
 

@@ -1,4 +1,29 @@
 import requests
+from google.transit import gtfs_realtime_pb2 as gtfs_rt
+
+
+def gtfs_realtime_import(url: str) -> dict:
+    """Fetch and parse a GTFS Realtime feed from a URL.
+
+    Args:
+        url (str): The URL of the GTFS Realtime feed.
+
+    Returns:
+        dict: A parsed `FeedMessage` object.
+
+    Raises:
+        requests.RequestException: If the HTTP request fails.
+        google.protobuf.message.DecodeError: If parsing the feed fails.
+
+    Examples:
+        >>> feed = gtfs_realtime_import("https://example.com/gtfs-realtime")
+        >>> feed.header.gtfs_realtime_version
+        '2.0'
+    """
+    feed_message_pb = requests.get(url).content
+    feed_message = gtfs_rt.FeedMessage()
+    feed_message.ParseFromString(feed_message_pb)
+    return feed_message
 
 
 def example_realtime_status(

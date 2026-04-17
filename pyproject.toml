@@ -12,6 +12,8 @@ license = { text = "Apache-2.0" }
 keywords = ["django", "gtfs", "transit", "schedule", "realtime"]
 dependencies = [
     "django>=5.2.0",
+    "gtfs-realtime-bindings>=2.0.0",
+    "requests>=2.33.1",
 ]
 
 [project.urls]
