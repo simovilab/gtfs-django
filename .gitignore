@@ -1,3 +1,6 @@
+# Zensical
+site/
+
 # Django migrations - KEEP MIGRATIONS for reusable Django apps
 # **/migrations/
 # **/migrations/*.py
