@@ -1,0 +1,17 @@
+[
+  {
+    "model": "sch_pipeline.gtfsprovider",
+    "pk": 1,
+    "fields": {
+      "code": "mbta",
+      "name": "Massachusetts Bay Transportation Authority",
+      "description": "Boston area transit authority",
+      "website": "https://www.mbta.com",
+      "timezone": "America/New_York",
+      "is_active": true,
+      "schedule_url": "https://cdn.mbta.com/MBTA_GTFS.zip",
+      "vehicle_positions_url": "https://cdn.mbta.com/realtime/VehiclePositions.pb",
+      "trip_updates_url": "https://cdn.mbta.com/realtime/TripUpdates.pb"
+    }
+  }
+]
