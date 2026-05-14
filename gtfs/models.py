@@ -14,6 +14,7 @@ class BaseAgency(models.Model):
     agency_id = models.CharField(
         max_length=255,
         blank=True,
+        null=True,
         help_text="Identificador único de la agencia de transportes.",
     )
     agency_name = models.CharField(
@@ -24,7 +25,10 @@ class BaseAgency(models.Model):
         max_length=255, help_text="Zona horaria de la agencia de transportes."
     )
     agency_lang = models.CharField(
-        max_length=2, blank=True, help_text="Código ISO 639-1 de idioma primario."
+        max_length=2,
+        blank=True,
+        null=True,
+        help_text="Código ISO 639-1 de idioma primario.",
     )
     agency_phone = models.CharField(
         max_length=127, blank=True, null=True, help_text="Número de teléfono."
@@ -92,10 +96,10 @@ class BaseStop(models.Model):
         ),
     )
     parent_station = models.CharField(
-        max_length=255, blank=True, help_text="Estación principal."
+        max_length=255, blank=True, null=True, help_text="Estación principal."
     )
     stop_timezone = models.CharField(
-        max_length=255, blank=True, help_text="Zona horaria de la parada."
+        max_length=255, blank=True, null=True, help_text="Zona horaria de la parada."
     )
     wheelchair_boarding = models.PositiveIntegerField(
         blank=True,
@@ -104,7 +108,7 @@ class BaseStop(models.Model):
         choices=((0, "No especificado"), (1, "Accesible"), (2, "No accesible")),
     )
     platform_code = models.CharField(
-        max_length=255, blank=True, help_text="Código de la plataforma."
+        max_length=255, blank=True, null=True, help_text="Código de la plataforma."
     )
 
     class Meta:
@@ -284,10 +288,10 @@ class BaseStopTime(models.Model):
     """
 
     trip_id = models.CharField(max_length=200)
-    arrival_time = models.TimeField(
+    arrival_time = models.DurationField(
         help_text="Hora de llegada a la parada.", blank=True, null=True
     )
-    departure_time = models.TimeField(
+    departure_time = models.DurationField(
         help_text="Hora de salida de la parada.", blank=True, null=True
     )
     stop_id = models.CharField(max_length=200)
