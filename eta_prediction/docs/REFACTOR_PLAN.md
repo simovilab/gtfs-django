@@ -33,7 +33,15 @@ Host paths (the prompt's `/home/jae/git/...` paths do not exist on this host —
 - **✅ Phase B (S3 storage layer) COMPLETE.** `rt_pipeline/storage/` (DuckDB-backed): `schema.py`, `config.py` (env creds), `s3_writer.py` (write/read with route + date pruning), `manifest.py` (query-derived index), `tests/` (9 pass). Day-level partitions `transit/feed/mbta/vehicle_positions/year=/month=/day=/route_id=/`, zstd, uuid file names (safe appends). Doc: `docs/S3_LAYOUT.md`. Added `duckdb` dep. **Not yet run against live MinIO** — local round-trip verified; live smoke test pending authorization (writes to `transit/`).
 - **✅ Live MinIO verified.** Smoke test wrote/read/listed a throwaway `transit/feed/mbta/_smoketest/` prefix against `data.simovilab.org`, then deleted it (`mc`); real bucket contents untouched.
 - **✅ Phase C (dataset builder reads RT from S3) COMPLETE.** `feature_engineering/rt_source.py` adapter over `rt_pipeline.storage`; `dataset_builder.py` Step 1 now reads S3 (route + date pushdown) instead of Postgres ORM; static joins stay ORM. 4 adapter tests pass. `build_eta_sample` unchanged (S3 base URI via env default). **Ops note:** ingest `.env` needs `AWS_ENDPOINT_URL`/`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` for the builder to read S3 in production.
-- **Next:** D (collector writes a Parquet partition to S3 on each poll + backfill command) and E (ETA wiring/validation on an S3-built dataset). D needs the poll-interval decision.
+- **✅ Phase D (collector S3 sink + backfill) COMPLETE.** VP parse task dual-writes to S3 (`S3_VP_SINK_ENABLED`, best-effort); `backfill_s3` command replays Postgres→S3 (day-by-day, `--dry-run`); poll default lowered to **5s** (matches MBTA VP refresh — best precision/storage balance; ~10–12 GB/mo vs ~166 GB free). 3 sink tests pass, `manage.py check` clean. `.env.example` documents `AWS_*`/`S3_VP_*`.
+- **✅ Phase E (ETA wiring & validation) COMPLETE.** Registry/estimator confirmed decoupled from Django models (no import of `gtfs`/`sch_pipeline`/`rt_pipeline`) → objective 4 structurally safe. Pinned the dataset feature contract (`ETADataset.FEATURE_GROUPS` vs builder output) and verified a full train→register→predict round-trip on `datasets/sample.parquet`. 3 tests pass.
+- **🎉 ALL PHASES (A–E) COMPLETE.** 9 commits on `refactor/schema-alignment-and-s3`. Total new tests: 16 (storage/rt_source/sink) + 3 (wiring) + package tests. No PR yet (awaiting instruction).
+
+### Remaining operational steps (not code)
+- Set `S3_VP_SINK_ENABLED=true` + `AWS_*` in the ingest `.env` to activate dual-write in production.
+- Run one live poll cycle to confirm end-to-end collector→S3 (only the local-override sink path is auto-tested).
+- Optional: backfill existing Postgres VPs to S3 via `manage.py backfill_s3`.
+- Decide eventual Postgres-RT cutover (keep dual-write or go S3-only) — see Q7.
 - **Security — DONE.** `SIMOVILAB-S3.md` set to `chmod 600`, confirmed untracked by git, note added documenting measures + rotation recommendation (rotation requires console admin).
 - **MBTA S3 path decided:** `transit/feed/mbta/vehicle_positions/year=/month=/day=/hour=/route_id=/…` (prefix inside existing `transit/` bucket).
 
