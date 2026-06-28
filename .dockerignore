@@ -1,0 +1,30 @@
+# Build context is the repo root (for the ingest image). Keep it lean and
+# never ship venvs, caches, secrets, or large regenerable artifacts.
+.git
+**/.git
+**/.venv
+.venv
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/node_modules
+
+# Secrets — provided at runtime via env_file, never baked into the image
+**/.env
+**/.env.*
+!**/.env.example
+
+# Regenerable / heavy artifacts
+**/graphify-out
+**/*.egg-info
+eta_prediction/models/trained
+eta_prediction/datasets/*.parquet
+!eta_prediction/datasets/sample.parquet
+**/celerybeat-schedule*
+**/profiling/*.csv
+
+# OS / editor
+**/.DS_Store
