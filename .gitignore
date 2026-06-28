@@ -325,3 +325,14 @@ yarn-error.log*
 
 # uv
 .python-version
+
+# --- ETA suite generated artifacts (regenerable; keep out of the repo) ---
+# Built datasets, except the committed sample fixtures.
+eta_prediction/datasets/*.parquet
+!eta_prediction/datasets/sample.parquet
+# Trained model registry artifacts (retrainable outputs).
+eta_prediction/models/trained/
+# Runtime profiling output (bytewax/profiling samples remain tracked).
+eta_prediction/prefect/profiling/
+# Celery beat runtime state
+celerybeat-schedule*
