@@ -6,10 +6,32 @@ from datetime import datetime, timezone
 from django.db import transaction, IntegrityError
 from .models import RawMessage, VehiclePosition, TripUpdate
 import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _sha256_hex(b: bytes) -> str: return hashlib.sha256(b).hexdigest()
 def _to_ts(sec): return datetime.fromtimestamp(sec, tz=timezone.utc) if sec else None
 def _now(): return datetime.now(timezone.utc)
+
+
+def _maybe_sink_vp_to_s3(records):
+    """Dual-write parsed VP records to the S3 Hive-Parquet store.
+
+    Env-gated (S3_VP_SINK_ENABLED) and best-effort: any failure is logged and
+    swallowed so it can never break Postgres ingestion.
+    """
+    if not records or not getattr(settings, "S3_VP_SINK_ENABLED", False):
+        return 0
+    try:
+        import pandas as pd
+        from rt_pipeline.storage import write_vehicle_positions
+
+        base_uri = getattr(settings, "S3_VP_BASE_URI", "") or None
+        return write_vehicle_positions(pd.DataFrame.from_records(records), base_uri)
+    except Exception as exc:  # never break ingestion on a sink error
+        logger.warning("S3 VP sink failed: %s", exc)
+        return 0
 
 # Vehicle Positions tasks
 @shared_task(bind=True, autoretry_for=(requests.RequestException,), retry_backoff=True, retry_kwargs={"max_retries": 5})
@@ -67,6 +89,8 @@ def parse_and_upsert_vehicle_positions(self, raw_message_id: str):
     feed.ParseFromString(bytes(raw.content))
 
     rows = []
+    s3_records = []
+    ingested = _now()
     for ent in feed.entity:
         if not ent.HasField("vehicle"):
             continue
@@ -86,6 +110,12 @@ def parse_and_upsert_vehicle_positions(self, raw_message_id: str):
             bearing=bearing, speed=speed, route_id=route_id, trip_id=trip_id,
             current_stop_sequence=css, raw_message_id=raw_message_id
         ))
+        s3_records.append({
+            "feed_name": settings.FEED_NAME, "vehicle_id": vh_id, "ts": ts,
+            "lat": lat, "lon": lon, "bearing": bearing, "speed": speed,
+            "route_id": route_id, "trip_id": trip_id,
+            "current_stop_sequence": css, "ingested_at": ingested,
+        })
 
     if not rows:
         return {"inserted": 0}
@@ -99,7 +129,8 @@ def parse_and_upsert_vehicle_positions(self, raw_message_id: str):
     except Exception as e:
         return {"error": str(e)}
 
-    return {"inserted": inserted}
+    sunk = _maybe_sink_vp_to_s3(s3_records)
+    return {"inserted": inserted, "s3_rows": sunk}
 
 # Trip Updates tasks
 @shared_task(bind=True, autoretry_for=(requests.RequestException,), retry_backoff=True, retry_kwargs={"max_retries": 5})

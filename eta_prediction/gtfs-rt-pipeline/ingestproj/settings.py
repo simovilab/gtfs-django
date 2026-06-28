@@ -59,9 +59,17 @@ REDIS_URL = env("REDIS_URL")
 FEED_NAME = env("FEED_NAME")
 GTFSRT_VEHICLE_POSITIONS_URL = env("GTFSRT_VEHICLE_POSITIONS_URL")
 GTFSRT_TRIP_UPDATES_URL = env("GTFSRT_TRIP_UPDATES_URL")
-POLL_SECONDS = env.int("POLL_SECONDS", default=15)
+POLL_SECONDS = env.int("POLL_SECONDS", default=5)  # matches MBTA VP refresh
 HTTP_CONNECT_TIMEOUT = env.float("HTTP_CONNECT_TIMEOUT", default=3.0)
 HTTP_READ_TIMEOUT = env.float("HTTP_READ_TIMEOUT", default=5.0)
+
+# --- S3 VehiclePosition sink (Hive-partitioned Parquet) ---
+# When enabled, each parsed VP batch is also written to the S3 store
+# (dual-write alongside Postgres). Credentials come from AWS_* env vars
+# (loaded from .env into os.environ above). Empty base URI -> storage default
+# (s3://transit/feed/mbta/vehicle_positions).
+S3_VP_SINK_ENABLED = env.bool("S3_VP_SINK_ENABLED", default=False)
+S3_VP_BASE_URI = env("S3_VP_BASE_URI", default="")
 
 from celery.schedules import schedule
 
