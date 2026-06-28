@@ -91,13 +91,13 @@ class StopAdmin(GISModelAdmin):
 
 @admin.register(Route)
 class RouteAdmin(admin.ModelAdmin):
-    list_display = ('route_short_name', 'route_long_name', 'route_type', 'feed', '_agency')
-    list_filter = ('feed', 'route_type', '_agency')
+    list_display = ('route_short_name', 'route_long_name', 'route_type', 'feed', 'linked_agency')
+    list_filter = ('feed', 'route_type', 'linked_agency')
     search_fields = ('route_id', 'route_short_name', 'route_long_name')
-    readonly_fields = ('_agency',)
+    readonly_fields = ('linked_agency',)
     fieldsets = (
         ('Identification', {
-            'fields': ('feed', 'route_id', 'agency_id', '_agency')
+            'fields': ('feed', 'route_id', 'agency_id', 'linked_agency')
         }),
         ('Names', {
             'fields': ('route_short_name', 'route_long_name', 'route_desc')
@@ -151,7 +151,7 @@ class CalendarDateAdmin(admin.ModelAdmin):
     list_filter = ('feed', 'exception_type', 'date')
     search_fields = ('service_id', 'holiday_name')
     date_hierarchy = 'date'
-    readonly_fields = ('_service',)
+    readonly_fields = ('linked_service',)
 
 
 @admin.register(Shape)
@@ -186,13 +186,13 @@ class TripAdmin(admin.ModelAdmin):
     list_display = ('trip_id', 'route_id', 'service_id', 'trip_headsign', 'direction_id', 'feed')
     list_filter = ('feed', 'direction_id', 'wheelchair_accessible', 'bikes_allowed')
     search_fields = ('trip_id', 'trip_headsign', 'route_id')
-    readonly_fields = ('_route', '_service', 'geoshape')
+    readonly_fields = ('linked_route', 'linked_service', 'geoshape')
     fieldsets = (
         ('Identification', {
-            'fields': ('feed', 'trip_id', 'route_id', '_route')
+            'fields': ('feed', 'trip_id', 'route_id', 'linked_route')
         }),
         ('Service', {
-            'fields': ('service_id', '_service', 'direction_id')
+            'fields': ('service_id', 'linked_service', 'direction_id')
         }),
         ('Display', {
             'fields': ('trip_headsign', 'trip_short_name')
@@ -212,11 +212,11 @@ class StopTimeAdmin(admin.ModelAdmin):
     list_display = ('trip_id', 'stop_sequence', 'stop_id', 'arrival_time', 'departure_time', 'feed')
     list_filter = ('feed', 'pickup_type', 'drop_off_type', 'timepoint')
     search_fields = ('trip_id', 'stop_id')
-    readonly_fields = ('_trip', '_stop')
+    readonly_fields = ('linked_trip', 'linked_stop')
     ordering = ('trip_id', 'stop_sequence')
     fieldsets = (
         ('References', {
-            'fields': ('feed', 'trip_id', '_trip', 'stop_id', '_stop')
+            'fields': ('feed', 'trip_id', 'linked_trip', 'stop_id', 'linked_stop')
         }),
         ('Sequence', {
             'fields': ('stop_sequence',)
@@ -239,10 +239,10 @@ class FareAttributeAdmin(admin.ModelAdmin):
     list_display = ('fare_id', 'price', 'currency_type', 'payment_method', 'feed')
     list_filter = ('feed', 'currency_type', 'payment_method', 'transfers')
     search_fields = ('fare_id',)
-    readonly_fields = ('_agency',)
+    readonly_fields = ('linked_agency',)
     fieldsets = (
         ('Identification', {
-            'fields': ('feed', 'fare_id', 'agency_id', '_agency')
+            'fields': ('feed', 'fare_id', 'agency_id', 'linked_agency')
         }),
         ('Price', {
             'fields': ('price', 'currency_type', 'payment_method')
@@ -258,7 +258,7 @@ class FareRuleAdmin(admin.ModelAdmin):
     list_display = ('fare_id', 'route_id', 'origin_id', 'destination_id', 'feed')
     list_filter = ('feed',)
     search_fields = ('fare_id', 'route_id')
-    readonly_fields = ('_fare', '_route')
+    readonly_fields = ('linked_fare', 'linked_route')
 
 
 @admin.register(FeedInfo)
@@ -284,7 +284,7 @@ class RouteStopAdmin(admin.ModelAdmin):
     list_display = ('route_id', 'stop_id', 'stop_sequence', 'direction_id', 'timepoint', 'feed')
     list_filter = ('feed', 'direction_id', 'timepoint')
     search_fields = ('route_id', 'stop_id')
-    readonly_fields = ('_route', '_shape', '_stop')
+    readonly_fields = ('linked_route', 'linked_shape', 'linked_stop')
     ordering = ('route_id', 'shape_id', 'stop_sequence')
 
 
@@ -293,7 +293,7 @@ class TripDurationAdmin(admin.ModelAdmin):
     list_display = ('route_id', 'service_id', 'start_time', 'end_time', 'stretch', 'stretch_duration', 'feed')
     list_filter = ('feed',)
     search_fields = ('route_id', 'service_id')
-    readonly_fields = ('_route', '_shape', '_service')
+    readonly_fields = ('linked_route', 'linked_shape', 'linked_service')
     ordering = ('route_id', 'start_time', 'stretch')
 
 
@@ -302,5 +302,5 @@ class TripTimeAdmin(admin.ModelAdmin):
     list_display = ('trip_id', 'stop_id', 'stop_sequence', 'departure_time', 'feed')
     list_filter = ('feed',)
     search_fields = ('trip_id', 'stop_id')
-    readonly_fields = ('_trip', '_stop')
+    readonly_fields = ('linked_trip', 'linked_stop')
     ordering = ('trip_id', 'stop_sequence')
