@@ -7,7 +7,7 @@ Storage contract for collected GTFS-RT VehiclePositions. Read/written by
 ## Location & partition scheme
 
 ```
-s3://transit/feed/mbta/vehicle_positions/
+s3://transit/feeds/mbta/vehicle_positions/
     year=<YYYY>/month=<M>/day=<D>/route_id=<route_id>/<uuid>_<i>.parquet
 ```
 
@@ -61,7 +61,7 @@ from rt_pipeline.storage import (
 )
 ```
 
-`base_uri` defaults to `s3://transit/feed/mbta/vehicle_positions`. Pass a
+`base_uri` defaults to `s3://transit/feeds/mbta/vehicle_positions`. Pass a
 local path in tests. `read_vehicle_positions` prunes on `route_ids` and the
 half-open UTC range `[start, end)`.
 

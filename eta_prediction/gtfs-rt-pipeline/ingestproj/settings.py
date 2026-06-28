@@ -67,7 +67,7 @@ HTTP_READ_TIMEOUT = env.float("HTTP_READ_TIMEOUT", default=5.0)
 # When enabled, each parsed VP batch is also written to the S3 store
 # (dual-write alongside Postgres). Credentials come from AWS_* env vars
 # (loaded from .env into os.environ above). Empty base URI -> storage default
-# (s3://transit/feed/mbta/vehicle_positions).
+# (s3://transit/feeds/mbta/vehicle_positions).
 S3_VP_SINK_ENABLED = env.bool("S3_VP_SINK_ENABLED", default=False)
 S3_VP_BASE_URI = env("S3_VP_BASE_URI", default="")
 

@@ -6,7 +6,7 @@ path (Hive style) so route-filtered reads prune partitions cheaply.
 
 Layout::
 
-    s3://transit/feed/mbta/vehicle_positions/
+    s3://transit/feeds/mbta/vehicle_positions/
         year=YYYY/month=M/day=D/route_id=<rid>/<uuid>.parquet
 
 Day-level time leaf (not hourly) keeps file counts manageable across MBTA's
@@ -20,7 +20,7 @@ import pandas as pd
 
 # --- Storage layout -------------------------------------------------------
 BUCKET = "transit"
-BASE_PREFIX = "feed/mbta/vehicle_positions"
+BASE_PREFIX = "feeds/mbta/vehicle_positions"
 # Order matters: this is the on-disk partition nesting order.
 PARTITION_COLUMNS = ("year", "month", "day", "route_id")
 COMPRESSION = "zstd"  # better ratio than snappy for cold S3 storage
