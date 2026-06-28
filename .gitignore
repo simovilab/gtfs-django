@@ -1,11 +1,13 @@
-# Django migrations
-**/migrations/
-**/migrations/*.py
+# Django migrations are tracked (reproducible schema across CI/Docker).
+# Only ignore their compiled artifacts.
 **/migrations/*.pyc
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+graphify-out/
 
 # C extensions
 *.so
