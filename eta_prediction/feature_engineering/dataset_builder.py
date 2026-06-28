@@ -8,9 +8,8 @@ from math import radians, cos, sin, asin, sqrt
 from pathlib import Path
 
 from django.db import connection as django_connection
-from django.db.models import F, Q
 from sch_pipeline.models import StopTime, Stop, Trip
-from rt_pipeline.models import VehiclePosition
+from feature_engineering.rt_source import fetch_vehicle_positions
 from feature_engineering.temporal import extract_temporal_features
 from feature_engineering.spatial import calculate_distance_features_with_shape, load_shape_for_trip
 from feature_engineering.weather import fetch_weather
@@ -87,6 +86,7 @@ def build_vp_training_dataset(
     use_shapes: bool = True,
     tz_for_temporal: str = "America/New_York",
     pg_conn: Optional[Any] = None,
+    vp_source_uri: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Build training dataset from VehiclePosition data only.
@@ -141,44 +141,23 @@ def build_vp_training_dataset(
     # ============================================================
     # STEP 1: Fetch VehiclePositions
     # ============================================================
-    print("\nStep 1: Fetching VehiclePositions...")
-    
-    vp_qs = VehiclePosition.objects.exclude(
-        Q(trip_id__isnull=True) |
-        Q(lat__isnull=True) |
-        Q(lon__isnull=True)
-    )
-    
-    if start_date:
-        print(f"  Filtering start_date >= {start_date}")
-        vp_qs = vp_qs.filter(ts__gte=start_date)
-    
-    if end_date:
-        print(f"  Filtering end_date < {end_date}")
-        vp_qs = vp_qs.filter(ts__lt=end_date)
-    
-    # Filter by route if specified
+    print("\nStep 1: Fetching VehiclePositions (S3 Hive-partitioned Parquet)...")
     if route_ids:
-        print(f"  Filtering for routes: {route_ids}")
-        trip_ids_for_routes = list(
-            Trip.objects.filter(route_id__in=route_ids)
-            .values_list("trip_id", flat=True)
-        )
-        vp_qs = vp_qs.filter(trip_id__in=trip_ids_for_routes)
-    
-    print(f"  Fetching VehiclePosition records...")
-    vp_data = vp_qs.values(
-        'trip_id',
-        'vehicle_id',
-        'ts',
-        'lat',
-        'lon',
-        'bearing',
-        'speed',
-    ).order_by('trip_id', 'ts')
-    
-    vp_df = pd.DataFrame.from_records(vp_data)
-    print(f"  Retrieved {len(vp_df):,} VehiclePosition records")
+        print(f"  Route partition filter: {route_ids}")
+    if start_date:
+        print(f"  start_date >= {start_date}")
+    if end_date:
+        print(f"  end_date < {end_date}")
+
+    # RT now comes from the S3 store (route + date partition pushdown), not the
+    # live Postgres ORM. Returns the same columns the rest of this builder uses.
+    vp_df = fetch_vehicle_positions(
+        route_ids=route_ids,
+        start=start_date,
+        end=end_date,
+        base_uri=vp_source_uri,
+    )
+    print(f"  Retrieved {len(vp_df):,} VehiclePosition records from S3")
     
     if vp_df.empty:
         print("\nWARNING: No VehiclePosition data found!")
