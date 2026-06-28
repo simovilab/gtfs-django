@@ -30,9 +30,14 @@ class TestGtfsPackage:
         """Test that models can be imported without requiring DB setup."""
         # This will import the models module but not instantiate any models
         import gtfs.models
-        assert hasattr(gtfs.models, "Feed")
-        assert hasattr(gtfs.models, "Agency")
-        assert hasattr(gtfs.models, "Route")
+        # The package exposes abstract Base* models; concrete models are defined
+        # by the consuming app (Databús `feed/`, the ETA suite `sch_pipeline/`),
+        # which subclass these.
+        assert hasattr(gtfs.models, "BaseAgency")
+        assert hasattr(gtfs.models, "BaseStop")
+        assert hasattr(gtfs.models, "BaseRoute")
+        assert hasattr(gtfs.models, "BaseTrip")
+        assert hasattr(gtfs.models, "BaseStopTime")
         
     def test_verification_function(self):
         """A simple test function to verify editable installation works."""
