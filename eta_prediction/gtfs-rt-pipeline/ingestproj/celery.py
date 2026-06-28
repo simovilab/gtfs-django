@@ -11,6 +11,7 @@ app.conf.result_backend = settings.REDIS_URL
 app.conf.task_acks_late = True
 app.conf.worker_prefetch_multiplier = 4
 app.conf.task_routes = {
+    "rt_pipeline.tasks.poll_vehicle_positions_s3": {"queue": "fetch"},
     "rt_pipeline.tasks.fetch_vehicle_positions": {"queue": "fetch"},
     "rt_pipeline.tasks.parse_and_upsert_vehicle_positions": {"queue": "upsert"},
     "rt_pipeline.tasks.fetch_trip_updates": {"queue": "fetch"},

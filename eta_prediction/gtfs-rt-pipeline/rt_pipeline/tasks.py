@@ -15,23 +15,70 @@ def _to_ts(sec): return datetime.fromtimestamp(sec, tz=timezone.utc) if sec else
 def _now(): return datetime.now(timezone.utc)
 
 
-def _maybe_sink_vp_to_s3(records):
-    """Dual-write parsed VP records to the S3 Hive-Parquet store.
+def _write_vp_records_to_s3(records):
+    """Write VP records to the S3 Hive-Parquet store. Returns rows written."""
+    if not records:
+        return 0
+    import pandas as pd
+    from rt_pipeline.storage import write_vehicle_positions
 
-    Env-gated (S3_VP_SINK_ENABLED) and best-effort: any failure is logged and
-    swallowed so it can never break Postgres ingestion.
-    """
+    base_uri = getattr(settings, "S3_VP_BASE_URI", "") or None
+    return write_vehicle_positions(pd.DataFrame.from_records(records), base_uri)
+
+
+def _maybe_sink_vp_to_s3(records):
+    """Best-effort dual-write of parsed VP records to S3 (used by the legacy
+    Postgres path). Env-gated (S3_VP_SINK_ENABLED); swallows errors so it can
+    never break Postgres ingestion."""
     if not records or not getattr(settings, "S3_VP_SINK_ENABLED", False):
         return 0
     try:
-        import pandas as pd
-        from rt_pipeline.storage import write_vehicle_positions
-
-        base_uri = getattr(settings, "S3_VP_BASE_URI", "") or None
-        return write_vehicle_positions(pd.DataFrame.from_records(records), base_uri)
+        return _write_vp_records_to_s3(records)
     except Exception as exc:  # never break ingestion on a sink error
         logger.warning("S3 VP sink failed: %s", exc)
         return 0
+
+
+def _vp_entity_to_record(ent, ingested):
+    """Map a GTFS-RT vehicle entity to the flat storage record dict."""
+    v = ent.vehicle
+    return {
+        "feed_name": settings.FEED_NAME,
+        "vehicle_id": (v.vehicle.id or v.vehicle.label or ent.id or "unknown").strip(),
+        "ts": _to_ts(v.timestamp) or _now(),
+        "lat": v.position.latitude if v.HasField("position") else None,
+        "lon": v.position.longitude if v.HasField("position") else None,
+        "bearing": v.position.bearing if v.HasField("position") else None,
+        "speed": v.position.speed if v.HasField("position") else None,
+        "route_id": v.trip.route_id if v.HasField("trip") else None,
+        "trip_id": v.trip.trip_id if v.HasField("trip") else None,
+        "current_stop_sequence": v.current_stop_sequence
+        if v.HasField("current_stop_sequence") else None,
+        "ingested_at": ingested,
+    }
+
+
+# Vehicle Positions -> S3 only (no Postgres). This is the active scheduled task.
+@shared_task(bind=True, queue="fetch",
+             autoretry_for=(requests.RequestException,), retry_backoff=True,
+             retry_kwargs={"max_retries": 5})
+def poll_vehicle_positions_s3(self):
+    """Fetch the VehiclePositions feed and write it straight to S3 Hive-Parquet.
+
+    Does NOT touch Postgres (no RawMessage, no VehiclePosition rows). This is
+    the only task scheduled by beat; the legacy Postgres fetch/parse tasks
+    below are kept for reference but are not scheduled.
+    """
+    url = settings.GTFSRT_VEHICLE_POSITIONS_URL
+    r = requests.get(url, timeout=(settings.HTTP_CONNECT_TIMEOUT, settings.HTTP_READ_TIMEOUT))
+    r.raise_for_status()
+    if not r.content:
+        return {"skipped": True}
+    feed = gtfs_realtime_pb2.FeedMessage()
+    feed.ParseFromString(r.content)
+    ingested = _now()
+    records = [_vp_entity_to_record(ent, ingested) for ent in feed.entity if ent.HasField("vehicle")]
+    return {"s3_rows": _write_vp_records_to_s3(records)}
 
 # Vehicle Positions tasks
 @shared_task(bind=True, autoretry_for=(requests.RequestException,), retry_backoff=True, retry_kwargs={"max_retries": 5})
@@ -238,13 +285,12 @@ def parse_and_upsert_trip_updates(self, raw_id: str):
 from celery.schedules import schedule
 from ingestproj.celery import app as celery_app
 
+# Only VehiclePositions -> S3 is scheduled. The Postgres VP fetch/parse and the
+# TripUpdate tasks above remain defined but are intentionally NOT scheduled
+# (we only want VPs as Parquet in S3 right now). Re-add entries here to revive.
 celery_app.conf.beat_schedule = {
-    "poll-vehicle-positions": {
-        "task": "rt_pipeline.tasks.fetch_vehicle_positions",
-        "schedule": schedule(run_every=settings.POLL_SECONDS),
-    },
-    "poll-trip-updates": {
-        "task": "rt_pipeline.tasks.fetch_trip_updates",
+    "poll-vehicle-positions-s3": {
+        "task": "rt_pipeline.tasks.poll_vehicle_positions_s3",
         "schedule": schedule(run_every=settings.POLL_SECONDS),
     },
 }
