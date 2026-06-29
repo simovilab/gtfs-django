@@ -178,7 +178,6 @@ def build_vp_training_dataset(
           shape_progress, cross_track_error, progress_ratio, stops_ahead
         - kinematic: current_speed_kmh, bearing_to_stop, bearing_diff
         - status: is_at_stop
-        - schedule: scheduled_arrival, scheduled_travel_time
         - target: actual_arrival_computed, actual_arrival_stopped_at, actual_arrival,
           time_to_arrival_seconds_computed, time_to_arrival_seconds_stopped_at,
           time_to_arrival_seconds
@@ -424,15 +423,6 @@ def build_vp_training_dataset(
                 vp_bearing = vp_row.get('bearing')
                 stops_ahead = int(stop_row['stop_order'] - closest_stop_order)
 
-                closest_arr_sec = _seconds_of_day(
-                    trip_stops.loc[closest_stop_idx, 'arrival_time']
-                )
-                tgt_arr_sec = _seconds_of_day(stop_row['arrival_time'])
-                scheduled_travel_time = None
-                if closest_arr_sec is not None and tgt_arr_sec is not None:
-                    delta = tgt_arr_sec - closest_arr_sec
-                    scheduled_travel_time = delta if delta >= 0 else None
-
                 training_rows.append({
                     'trip_id': trip_id,
                     'route_id': vp_row['route_id'],
@@ -459,9 +449,6 @@ def build_vp_training_dataset(
                     'bearing_diff': _angle_diff(vp_bearing, bearing_to_stop),
                     # status
                     'is_at_stop': bool(vp_row.get('current_status') == "STOPPED_AT"),
-                    # schedule
-                    'scheduled_arrival': stop_row['arrival_time'],
-                    'scheduled_travel_time': scheduled_travel_time,
                     # target (both sources + canonical primary)
                     'actual_arrival_computed': actual_arrival_computed,
                     'actual_arrival_stopped_at': actual_arrival_stopped_at,
@@ -564,8 +551,6 @@ def build_vp_training_dataset(
         "current_speed_kmh", "bearing_to_stop", "bearing_diff",
         # status
         "is_at_stop",
-        # schedule
-        "scheduled_arrival", "scheduled_travel_time",
         # target (dual source + canonical)
         "actual_arrival_computed", "actual_arrival_stopped_at", "actual_arrival",
         "time_to_arrival_seconds_computed", "time_to_arrival_seconds_stopped_at",
