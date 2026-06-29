@@ -81,12 +81,7 @@ class EWMAModel:
                 new_ewma = self.alpha * observed + (1 - self.alpha) * old_ewma
                 self.ewma_values[key] = new_ewma
                 self.observation_counts[key] += 1
-        
-        print(f"Trained EWMA model (alpha={self.alpha})")
-        print(f"  Unique groups: {len(self.ewma_values)}")
-        print(f"  Total observations: {len(df_sorted)}")
-        print(f"  Global mean: {self.global_mean/60:.2f} minutes")
-    
+
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
         Predict ETAs using current EWMA values.
@@ -182,30 +177,20 @@ def train_ewma(dataset_name: str = "sample_dataset",
     Returns:
         Dictionary with model, metrics, metadata
     """
-    print(f"\n{'='*60}")
-    print(f"Training EWMA Model".center(60))
-    print(f"{'='*60}\n")
-    
-    route_info = f" (route: {route_id})" if route_id else " (global)"
-    print(f"Scope{route_info}")
-    print(f"Config: alpha={alpha}, group_by={group_by}, min_obs={min_observations}")
-    
     # Load dataset
-    print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
-    
+
     # Filter by route if specified
     if route_id is not None:
         df = dataset.df
         df_filtered = df[df['route_id'] == route_id].copy()
-        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
-        
+
         if len(df_filtered) == 0:
             raise ValueError(f"No data found for route {route_id}")
-        
+
         dataset.df = df_filtered
-    
+
     if pre_split is not None:
         train_df, val_df, test_df = (df.copy() for df in pre_split)
     else:
@@ -214,47 +199,33 @@ def train_ewma(dataset_name: str = "sample_dataset",
             train_frac=1-test_size-0.1,
             val_frac=0.1
         )
-    
+
     train_test_summary(train_df, test_df, val_df)
-    
+
     # Train model
-    print("Training model...")
     model = EWMAModel(
         alpha=alpha,
         group_by=group_by,
         min_observations=min_observations
     )
     model.fit(train_df)
-    
+
     # Evaluate on validation (with optional online updates)
-    print("\nValidation Performance:")
     y_val = val_df['time_to_arrival_seconds'].values
     val_preds = model.predict(val_df)
     val_metrics = compute_all_metrics(y_val, val_preds, prefix="val_")
     print_metrics_table(val_metrics, "Validation Metrics")
-    
     val_coverage = model.get_coverage(val_df)
-    print(f"Validation coverage: {val_coverage*100:.1f}%")
-    
-    # Optionally update model with validation data
-    print("\nUpdating model with validation data...")
+
+    # Update model with validation data (online), then evaluate on test
     model.update(val_df, y_val)
-    
-    # Evaluate on test set
-    print("\nTest Performance:")
+
     y_test = test_df['time_to_arrival_seconds'].values
     test_preds = model.predict(test_df)
     test_metrics = compute_all_metrics(y_test, test_preds, prefix="test_")
     print_metrics_table(test_metrics, "Test Metrics")
-    
     test_coverage = model.get_coverage(test_df)
-    print(f"Test coverage: {test_coverage*100:.1f}%")
-    
-    # Show some group stats
-    group_stats = model.get_group_stats()
-    print(f"\nTop 10 groups by observation count:")
-    print(group_stats.head(10))
-    
+
     # Prepare metadata
     metadata = {
         'model_type': 'ewma',

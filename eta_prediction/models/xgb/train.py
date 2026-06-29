@@ -159,117 +159,52 @@ class XGBTimeModel:
         Returns:
             Cleaned dataframe
         """
-        print(f"\n{'=' * 60}")
-        print("Data Cleaning (XGBoost)".center(60))
-        print(f"{'=' * 60}")
-        print(f"Initial rows: {len(df):,}")
-
         # Get all potential features
         feature_groups = self._get_feature_groups()
         all_features: List[str] = []
         for group_features in feature_groups.values():
             all_features.extend(group_features)
 
-        # Check which features are available and have acceptable NaN levels
+        # Keep features that are present and not mostly-NaN (>30% drops the feature)
         available: List[str] = []
-        missing: List[str] = []
-        high_nan: List[tuple[str, str]] = []
-
         for feat in all_features:
             if feat not in df.columns:
-                missing.append(feat)
                 continue
-
-            nan_ratio = df[feat].isna().sum() / len(df)
-
-            if nan_ratio > 0.3:  # More than 30% NaN
-                high_nan.append((feat, f"{nan_ratio * 100:.1f}%"))
-            else:
+            if df[feat].isna().sum() / len(df) <= 0.3:
                 available.append(feat)
-
-        # Print feature availability
-        if missing:
-            print(f"\n⚠️  Missing features: {', '.join(missing)}")
-        if high_nan:
-            print("⚠️  High NaN features (>30%):")
-            for feat, ratio in high_nan:
-                print(f"   - {feat}: {ratio} NaN")
-
-        print(f"\n✓ Available features ({len(available)}):")
-        for feat in available:
-            nan_count = df[feat].isna().sum()
-            if nan_count > 0:
-                print(f"   - {feat} ({nan_count:,} NaN)")
-            else:
-                print(f"   - {feat}")
 
         # Store available features
         self.available_features = available
 
         # Handle NaN based on strategy
         if self.handle_nan == "error":
-            # Check for any NaN in available features + target
             check_cols = available + [target_col]
-            nan_counts = df[check_cols].isna().sum()
-            if nan_counts.sum() > 0:
-                print("\nNaN values found:")
-                for col, count in nan_counts[nan_counts > 0].items():
-                    print(f"  {col}: {count}")
+            if df[check_cols].isna().sum().sum() > 0:
                 raise ValueError("NaN values found and handle_nan='error'")
             df_clean = df
 
         elif self.handle_nan == "drop":
-            # Drop rows with NaN in available features or target
             check_cols = available + [target_col]
-            initial_len = len(df)
             df_clean = df.dropna(subset=check_cols)
-            dropped = initial_len - len(df_clean)
-
-            if dropped > 0:
-                pct = (dropped / initial_len) * 100
-                print(f"\n✓ Dropped {dropped:,} rows ({pct:.2f}%) with NaN values")
 
         elif self.handle_nan == "impute":
-            # Impute NaN values
             df_clean = df.copy()
-            imputed: List[str] = []
-
             for feat in available:
-                nan_count = df_clean[feat].isna().sum()
-                if nan_count > 0:
+                if df_clean[feat].isna().sum() > 0:
                     if pd.api.types.is_numeric_dtype(df_clean[feat]):
-                        fill_val = df_clean[feat].median()
-                        df_clean[feat] = df_clean[feat].fillna(fill_val)
-                        imputed.append(f"{feat} (median={fill_val:.2f})")
+                        df_clean[feat] = df_clean[feat].fillna(df_clean[feat].median())
                     else:
-                        mode_val = df_clean[feat].mode()[0]
-                        df_clean[feat] = df_clean[feat].fillna(mode_val)
-                        imputed.append(f"{feat} (mode={mode_val})")
-
-            if imputed:
-                print(f"\n✓ Imputed features:")
-                for imp in imputed:
-                    print(f"   - {imp}")
-
+                        df_clean[feat] = df_clean[feat].fillna(df_clean[feat].mode()[0])
             # Still drop rows with target NaN
-            target_nan = df_clean[target_col].isna().sum()
-            if target_nan > 0:
-                df_clean = df_clean.dropna(subset=[target_col])
-                print(f"\n✓ Dropped {target_nan:,} rows with target NaN")
+            df_clean = df_clean.dropna(subset=[target_col])
 
         else:
             raise ValueError(f"Invalid handle_nan: {self.handle_nan}")
 
-        print(f"\nFinal rows: {len(df_clean):,}")
-
         # Validate no NaN remains
         remaining_nan = df_clean[available + [target_col]].isna().sum().sum()
         if remaining_nan > 0:
-            raise ValueError(
-                f"ERROR: {remaining_nan} NaN values remain after cleaning!"
-            )
-
-        print("✓ No NaN values in features or target")
+            raise ValueError(f"{remaining_nan} NaN values remain after cleaning!")
 
         return df_clean
 
@@ -309,11 +244,6 @@ class XGBTimeModel:
         self.categorical_features = []
         self._build_preprocessor()
 
-        print(f"\n{'=' * 60}")
-        print("Model Training (XGBoost)".center(60))
-        print(f"{'=' * 60}")
-        print(f"Features ({len(self.feature_cols)}): {', '.join(self.feature_cols)}")
-
         # Prepare data
         X = train_clean[self.feature_cols]
         y = train_clean[target_col].values
@@ -332,12 +262,6 @@ class XGBTimeModel:
             n_jobs=self.n_jobs,
         )
         self.model.fit(X_transformed, y)
-
-        print(
-            f"✓ XGBoost model trained "
-            f"(max_depth={self.max_depth}, n_estimators={self.n_estimators}, "
-            f"learning_rate={self.learning_rate})"
-        )
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
@@ -442,20 +366,7 @@ def train_xgboost(
     Returns:
         Dictionary with model, metrics, metadata
     """
-    print(f"\n{'=' * 60}")
-    print("XGBoost Time Model".center(60))
-    print(f"{'=' * 60}\n")
-
-    route_info = f" (route: {route_id})" if route_id else " (global)"
-    print(f"Scope{route_info}")
-    print("Config:")
-    print(f"  max_depth={max_depth}, n_estimators={n_estimators}, learning_rate={learning_rate}")
-    print(f"  subsample={subsample}, colsample_bytree={colsample_bytree}")
-    print(f"  temporal={include_temporal}, spatial={include_spatial}")
-    print(f"  handle_nan='{handle_nan}'")
-
     # Load dataset
-    print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
 
@@ -463,7 +374,6 @@ def train_xgboost(
     if route_id is not None:
         df = dataset.df
         df_filtered = df[df["route_id"] == route_id].copy()
-        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
 
         if len(df_filtered) == 0:
             raise ValueError(f"No data found for route {route_id}")
@@ -482,10 +392,6 @@ def train_xgboost(
     train_test_summary(train_df, test_df, val_df)
 
     # Train model
-    print("\n" + "=" * 60)
-    print("Training".center(60))
-    print("=" * 60)
-
     model = XGBTimeModel(
         max_depth=max_depth,
         n_estimators=n_estimators,
@@ -499,29 +405,16 @@ def train_xgboost(
     model.fit(train_df)
 
     # Validation
-    print(f"\n{'=' * 60}")
-    print("Validation Performance".center(60))
-    print(f"{'=' * 60}")
     y_val = val_df["time_to_arrival_seconds"].values
     val_preds = model.predict(val_df)
     val_metrics = compute_all_metrics(y_val, val_preds, prefix="val_")
     print_metrics_table(val_metrics, "Validation")
 
     # Test
-    print(f"\n{'=' * 60}")
-    print("Test Performance".center(60))
-    print(f"{'=' * 60}")
     y_test = test_df["time_to_arrival_seconds"].values
     test_preds = model.predict(test_df)
     test_metrics = compute_all_metrics(y_test, test_preds, prefix="test_")
     print_metrics_table(test_metrics, "Test")
-
-    # Feature importance
-    importance = model.get_feature_importance()
-    if importance:
-        print(f"\nTop 5 Features by Importance:")
-        for i, (feat, imp) in enumerate(list(importance.items())[:5], 1):
-            print(f"  {i}. {feat}: {imp:.6f}")
 
     # Metadata
     metadata = {
@@ -567,7 +460,6 @@ def train_xgboost(
         registry = get_registry()
         registry.save_model(model_key, model, metadata)
         metadata["model_key"] = model_key
-        print(f"\n✓ Model saved: {model_key}")
 
     return {
         "model": model,

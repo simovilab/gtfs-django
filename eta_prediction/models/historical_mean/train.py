@@ -59,11 +59,7 @@ class HistoricalMeanModel:
             ('std', 'std'),
             ('count', 'count')
         ]).reset_index()
-        
-        print(f"Trained on {len(train_df)} samples")
-        print(f"Created {len(self.lookup_table)} unique groups")
-        print(f"Global mean ETA: {self.global_mean/60:.2f} minutes")
-        
+
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
         Predict ETAs for input data.
@@ -129,30 +125,20 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
     Returns:
         Dictionary with model, metrics, and metadata
     """
-    print(f"\n{'='*60}")
-    print(f"Training Historical Mean Model".center(60))
-    print(f"{'='*60}\n")
-    
-    route_info = f" (route: {route_id})" if route_id else " (global)"
-    print(f"Scope{route_info}")
-    print(f"Group by: {group_by}")
-    
     # Load dataset
-    print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
-    
+
     # Filter by route if specified
     if route_id is not None:
         df = dataset.df
         df_filtered = df[df['route_id'] == route_id].copy()
-        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
-        
+
         if len(df_filtered) == 0:
             raise ValueError(f"No data found for route {route_id}")
-        
+
         dataset.df = df_filtered
-    
+
     if pre_split is not None:
         train_df, val_df, test_df = (df.copy() for df in pre_split)
     else:
@@ -160,34 +146,27 @@ def train_historical_mean(dataset_name: str = "sample_dataset",
             train_frac=1-test_size-0.1,
             val_frac=0.1
         )
-    
+
     train_test_summary(train_df, test_df, val_df)
-    
+
     # Train model
-    print("Training model...")
     model = HistoricalMeanModel(group_by=group_by)
     model.fit(train_df)
-    
+
     # Evaluate on validation set
-    print("\nValidation Performance:")
     y_val = val_df['time_to_arrival_seconds'].values
     val_preds = model.predict(val_df)
     val_metrics = compute_all_metrics(y_val, val_preds, prefix="val_")
     print_metrics_table(val_metrics, "Validation Metrics")
-    
     val_coverage = model.get_coverage(val_df)
-    print(f"Validation coverage: {val_coverage*100:.1f}%")
-    
+
     # Evaluate on test set
-    print("\nTest Performance:")
     y_test = test_df['time_to_arrival_seconds'].values
     test_preds = model.predict(test_df)
     test_metrics = compute_all_metrics(y_test, test_preds, prefix="test_")
     print_metrics_table(test_metrics, "Test Metrics")
-    
     test_coverage = model.get_coverage(test_df)
-    print(f"Test coverage: {test_coverage*100:.1f}%")
-    
+
     # Prepare metadata
     metadata = {
         'model_type': 'historical_mean',

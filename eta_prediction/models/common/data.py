@@ -85,10 +85,7 @@ class ETADataset:
         # Filter too-close stops (likely already passed)
         if 'distance_to_stop' in self.df.columns:
             self.df = self.df[self.df['distance_to_stop'] >= min_distance]
-        
-        print(f"Cleaned: {initial_rows} → {len(self.df)} rows "
-              f"({100 * len(self.df) / initial_rows:.1f}% retained)")
-        
+
         return self
     
     def get_features(self, feature_groups: List[str]) -> List[str]:
@@ -132,9 +129,7 @@ class ETADataset:
         train_df = df_sorted.iloc[:train_end].copy()
         val_df = df_sorted.iloc[train_end:val_end].copy()
         test_df = df_sorted.iloc[val_end:].copy()
-        
-        print(f"Temporal split: train={len(train_df)}, val={len(val_df)}, test={len(test_df)}")
-        
+
         return train_df, val_df, test_df
     
     def route_split(self,

@@ -75,8 +75,6 @@ class PolyRegDistanceModel:
                 model = self._create_pipeline()
                 model.fit(X, y)
                 self.models[route_id] = model
-            
-            print(f"Trained {len(self.models)} route-specific models (degree={self.degree})")
         else:
             # Fit single global model
             X = train_df[['distance_to_stop']].values
@@ -84,9 +82,7 @@ class PolyRegDistanceModel:
             
             self.global_model = self._create_pipeline()
             self.global_model.fit(X, y)
-            
-            print(f"Trained global model (degree={self.degree}, alpha={self.alpha})")
-    
+
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
         Predict ETAs.
@@ -181,32 +177,22 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
     Returns:
         Dictionary with model, metrics, and metadata
     """
-    print(f"\n{'='*60}")
-    print(f"Training Polynomial Regression Distance Model".center(60))
-    print(f"{'='*60}\n")
-    
-    route_info = f" (route: {route_id})" if route_id else " (global)"
-    print(f"Scope{route_info}")
-    print(f"Config: degree={degree}, alpha={alpha}, route_specific={route_specific}")
-    
     # Load dataset
-    print(f"\nLoading dataset: {dataset_name}")
     dataset = load_dataset(dataset_name)
     dataset.clean_data()
-    
+
     # Filter by route if specified (single-route model)
     if route_id is not None:
         df = dataset.df
         df_filtered = df[df['route_id'] == route_id].copy()
-        print(f"Filtered to route {route_id}: {len(df_filtered):,} samples")
-        
+
         if len(df_filtered) == 0:
             raise ValueError(f"No data found for route {route_id}")
-        
+
         dataset.df = df_filtered
         # When training on single route, don't need route_specific flag
         route_specific = False
-    
+
     if pre_split is not None:
         train_df, val_df, test_df = (df.copy() for df in pre_split)
     else:
@@ -214,39 +200,29 @@ def train_polyreg_distance(dataset_name: str = "sample_dataset",
             train_frac=1-test_size-0.1,
             val_frac=0.1
         )
-    
+
     train_test_summary(train_df, test_df, val_df)
-    
+
     # Train model
-    print("Training model...")
     model = PolyRegDistanceModel(
         degree=degree,
         alpha=alpha,
         route_specific=route_specific
     )
     model.fit(train_df)
-    
+
     # Evaluate on validation set
-    print("\nValidation Performance:")
     y_val = val_df['time_to_arrival_seconds'].values
     val_preds = model.predict(val_df)
     val_metrics = compute_all_metrics(y_val, val_preds, prefix="val_")
     print_metrics_table(val_metrics, "Validation Metrics")
-    
+
     # Evaluate on test set
-    print("\nTest Performance:")
     y_test = test_df['time_to_arrival_seconds'].values
     test_preds = model.predict(test_df)
     test_metrics = compute_all_metrics(y_test, test_preds, prefix="test_")
     print_metrics_table(test_metrics, "Test Metrics")
-    
-    # Get sample coefficients
-    sample_coefs = model.get_coefficients(route_id=route_id)
-    if sample_coefs:
-        print(f"\nModel coefficients:")
-        print(f"  Intercept: {sample_coefs['intercept']:.2f}")
-        print(f"  Coefficients: {[f'{c:.6f}' for c in sample_coefs['coefficients'][:5]]}")
-    
+
     # Prepare metadata
     metadata = {
         'model_type': 'polyreg_distance',
