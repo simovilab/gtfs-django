@@ -135,3 +135,57 @@ def test_empty_df_writes_nothing(tmp_path):
 def test_read_missing_dataset_returns_empty(tmp_path):
     rows = read_vehicle_positions(base_uri=str(tmp_path / "nope"))
     assert rows.empty
+
+
+def _part_dir(tmp_path, route_id="Green-D", year=2025, month=1, day=2):
+    return (
+        tmp_path / "vp" / f"year={year}" / f"month={month}" / f"day={day}"
+        / f"route_id={route_id}"
+    )
+
+
+def test_compact_merges_partition_files(tmp_path):
+    from rt_pipeline.storage.compaction import compact
+
+    base = str(tmp_path / "vp")
+    write_vehicle_positions(_sample("Green-D", 2, 4), base)
+    write_vehicle_positions(_sample("Green-D", 2, 4), base)  # same (vehicle_id, ts)
+    write_vehicle_positions(_sample("Green-D", 2, 4, vehicle_prefix="z"), base)
+
+    part = _part_dir(tmp_path)
+    assert len(list(part.glob("*.parquet"))) == 3
+
+    res = compact(base, before_date=dt.date(2025, 1, 3))
+    assert res.partitions_compacted == 1
+    assert res.files_removed == 3
+    assert len(list(part.glob("*.parquet"))) == 1  # merged to one file
+
+    rows = read_vehicle_positions(route_ids=["Green-D"], base_uri=base)
+    assert len(rows) == 8  # v0..v3 (dup batch collapsed) + z0..z3
+    assert rows.duplicated(subset=["vehicle_id", "ts"]).sum() == 0
+
+
+def test_compact_skips_active_day(tmp_path):
+    from rt_pipeline.storage.compaction import compact
+
+    base = str(tmp_path / "vp")
+    write_vehicle_positions(_sample("Green-D", 2, 4), base)
+    write_vehicle_positions(_sample("Green-D", 2, 4, vehicle_prefix="z"), base)
+
+    # before_date == the partition day -> day is not strictly before -> untouched
+    res = compact(base, before_date=dt.date(2025, 1, 2))
+    assert res.partitions_compacted == 0
+    assert len(list(_part_dir(tmp_path).glob("*.parquet"))) == 2
+
+
+def test_compact_dry_run_changes_nothing(tmp_path):
+    from rt_pipeline.storage.compaction import compact
+
+    base = str(tmp_path / "vp")
+    write_vehicle_positions(_sample("Green-D", 2, 4), base)
+    write_vehicle_positions(_sample("Green-D", 2, 4, vehicle_prefix="z"), base)
+
+    res = compact(base, before_date=dt.date(2025, 1, 3), dry_run=True)
+    assert res.dry_run is True
+    assert res.partitions_compacted == 1
+    assert len(list(_part_dir(tmp_path).glob("*.parquet"))) == 2  # untouched

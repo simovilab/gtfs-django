@@ -5,10 +5,12 @@ Public API:
     read_vehicle_positions(route_ids, start, end, base_uri=None) -> DataFrame
     list_partitions(base_uri=None)               -> partition index
     available_routes(base_uri=None)              -> [route_id, ...]
+    compact(base_uri=None, ...)                  -> CompactionResult
 """
 
 from __future__ import annotations
 
+from .compaction import CompactionResult, compact
 from .config import S3Config
 from .manifest import available_routes, list_partitions
 from .s3_writer import connect, read_vehicle_positions, write_vehicle_positions
@@ -27,6 +29,8 @@ __all__ = [
     "read_vehicle_positions",
     "list_partitions",
     "available_routes",
+    "compact",
+    "CompactionResult",
     "connect",
     "s3_base_uri",
     "BUCKET",
