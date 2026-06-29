@@ -102,6 +102,17 @@ class Command(BaseCommand):
                 "s3://transit/feeds/mbta/vehicle_positions)"
             ),
         )
+        parser.add_argument(
+            "--arrival-source",
+            choices=["computed", "stopped_at"],
+            default="computed",
+            help=(
+                "Which arrival drives time_to_arrival_seconds: 'computed' "
+                "(first VP within distance threshold) or 'stopped_at' (GTFS-RT "
+                "current_status==STOPPED_AT; needs newly-collected data). Both "
+                "columns are always emitted. Default: computed."
+            ),
+        )
 
     def handle(self, *args, **opts):
         n = opts["top_routes"]
@@ -190,6 +201,7 @@ class Command(BaseCommand):
                 f"  VP source: {vp_source_uri or 's3 default (transit/feeds/mbta/vehicle_positions)'}"
             )
         )
+        self.stdout.write(self.style.NOTICE(f"  Arrival source: {opts['arrival_source']}"))
 
         # Build dataset
         try:
@@ -204,6 +216,7 @@ class Command(BaseCommand):
                 # vp_sample_interval_seconds=vp_sample_interval,
                 attach_weather=attach_weather,
                 vp_source_uri=vp_source_uri,
+                arrival_source=opts["arrival_source"],
             )
         except Exception as e:
             self.stdout.write(

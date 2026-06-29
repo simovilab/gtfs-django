@@ -54,6 +54,13 @@ def _vp_entity_to_record(ent, ingested):
         "trip_id": v.trip.trip_id if v.HasField("trip") else None,
         "current_stop_sequence": v.current_stop_sequence
         if v.HasField("current_stop_sequence") else None,
+        # VehicleStopStatus enum name (INCOMING_AT/STOPPED_AT/IN_TRANSIT_TO) and
+        # the stop it refers to — needed for STOPPED_AT-based arrival + is_at_stop.
+        "current_status": (
+            gtfs_realtime_pb2.VehiclePosition.VehicleStopStatus.Name(v.current_status)
+            if v.HasField("current_status") else None
+        ),
+        "stop_id": v.stop_id if v.HasField("stop_id") else None,
         "ingested_at": ingested,
     }
 

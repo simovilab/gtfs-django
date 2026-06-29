@@ -4,7 +4,7 @@ from datetime import datetime, date, time, timedelta
 from typing import Optional, List, Any, Dict
 import numpy as np
 import pandas as pd
-from math import radians, cos, sin, asin, sqrt
+from math import radians, degrees, cos, sin, asin, atan2, sqrt
 from pathlib import Path
 
 from django.db import connection as django_connection
@@ -73,7 +73,61 @@ def find_actual_arrival_time(vp_df_for_trip, stop_lat, stop_lon, distance_thresh
     # Only use closest approach if reasonably close (e.g., within 200m)
     if min_distance <= 200:
         return vp_df_for_trip.loc[closest_idx, 'ts']
-    
+
+    return None
+
+
+def find_stopped_at_arrival(vp_df_for_trip, target_stop_id, target_stop_seq):
+    """Arrival ts from GTFS-RT status: first VP reporting STOPPED_AT at the stop.
+
+    Matches on ``stop_id`` when available, else falls back to
+    ``current_stop_sequence``. Returns None when no qualifying VP exists (e.g.
+    pre-capture data where ``current_status`` is null).
+    """
+    if vp_df_for_trip.empty or "current_status" not in vp_df_for_trip.columns:
+        return None
+
+    stopped = vp_df_for_trip[vp_df_for_trip["current_status"] == "STOPPED_AT"]
+    if stopped.empty:
+        return None
+
+    by_id = None
+    if target_stop_id is not None and "stop_id" in stopped.columns:
+        by_id = stopped[stopped["stop_id"].astype("string") == str(target_stop_id)]
+    if by_id is not None and not by_id.empty:
+        return by_id["ts"].min()
+
+    if target_stop_seq is not None and "current_stop_sequence" in stopped.columns:
+        by_seq = stopped[stopped["current_stop_sequence"] == target_stop_seq]
+        if not by_seq.empty:
+            return by_seq["ts"].min()
+
+    return None
+
+
+def _initial_bearing(lat1, lon1, lat2, lon2):
+    """Initial great-circle bearing from point 1 to point 2, in degrees [0, 360)."""
+    φ1, φ2 = radians(lat1), radians(lat2)
+    dλ = radians(lon2 - lon1)
+    x = sin(dλ) * cos(φ2)
+    y = cos(φ1) * sin(φ2) - sin(φ1) * cos(φ2) * cos(dλ)
+    return (degrees(atan2(x, y)) + 360.0) % 360.0
+
+
+def _angle_diff(a, b):
+    """Smallest absolute difference between two bearings, in degrees [0, 180]."""
+    if a is None or b is None:
+        return None
+    d = abs(float(a) - float(b)) % 360.0
+    return d if d <= 180.0 else 360.0 - d
+
+
+def _seconds_of_day(t):
+    """Seconds since midnight for a datetime.time / GTFS arrival_time, else None."""
+    if t is None or pd.isna(t):
+        return None
+    if hasattr(t, "hour"):
+        return t.hour * 3600 + t.minute * 60 + getattr(t, "second", 0)
     return None
 
 
@@ -88,6 +142,7 @@ def build_vp_training_dataset(
     tz_for_temporal: str = "America/New_York",
     pg_conn: Optional[Any] = None,
     vp_source_uri: Optional[str] = None,
+    arrival_source: str = "computed",
 ) -> pd.DataFrame:
     """
     Build training dataset from VehiclePosition data only.
@@ -109,18 +164,31 @@ def build_vp_training_dataset(
         use_shapes: Whether to use GTFS shapes for accurate progress calculation
         tz_for_temporal: Timezone for temporal features
         pg_conn: PostgreSQL connection for shape loading (defaults to Django connection)
-    
+        vp_source_uri: Override S3 base URI for the VP store
+        arrival_source: Which arrival drives the canonical target —
+            'computed' (first VP within distance_threshold of the stop) or
+            'stopped_at' (first VP reporting GTFS-RT current_status==STOPPED_AT
+            at the stop). Both columns are always emitted when derivable.
+
     Returns:
         DataFrame with columns:
-        - trip_id, route_id, vehicle_id
-        - vp_ts, vp_lat, vp_lon
-        - stop_id, stop_sequence, stop_lat, stop_lon
-        - distance_to_stop (meters), progress_on_segment, progress_ratio
-        - scheduled_arrival, actual_arrival, delay_seconds
-        - temporal features (hour, day_of_week, etc.)
-        - operational features (headway, congestion proxies)
-        - weather features (temperature, precipitation, wind_speed)
+        - trip_id, route_id, vehicle_id, stop_id, stop_sequence, stop_lat/lon
+        - vp_ts, vp_lat, vp_lon, vp_bearing
+        - spatial: distance_to_stop, distance_to_next_stop, shape_distance_to_stop,
+          shape_progress, cross_track_error, progress_ratio, stops_ahead
+        - kinematic: current_speed_kmh, bearing_to_stop, bearing_diff
+        - status: is_at_stop
+        - schedule: scheduled_arrival, scheduled_travel_time
+        - target: actual_arrival_computed, actual_arrival_stopped_at, actual_arrival,
+          time_to_arrival_seconds_computed, time_to_arrival_seconds_stopped_at,
+          time_to_arrival_seconds
+        - temporal: hour, day_of_week, is_weekend, is_holiday, is_peak_hour,
+          hour_sin, hour_cos, dow_sin, dow_cos
     """
+    if arrival_source not in ("computed", "stopped_at"):
+        raise ValueError(
+            f"arrival_source must be 'computed' or 'stopped_at', got {arrival_source!r}"
+        )
     
     _banner_lines = []
     if route_ids:
@@ -300,7 +368,7 @@ def build_vp_training_dataset(
             
             # For each upcoming stop, find actual arrival time
             for stop_idx, stop_row in upcoming_stops.iterrows():
-                # Find actual arrival from future VPs
+                # Future VPs of this trip (used to detect arrival both ways)
                 future_vps = trip_vps[trip_vps['ts'] > vp_ts]
 
                 stop_payload = {
@@ -317,8 +385,8 @@ def build_vp_training_dataset(
                         'lat': stop_row['next_stop_lat'],
                         'lon': stop_row['next_stop_lon'],
                     }
-                
-                # Calculate spatial features (with shape if available)
+
+                # Spatial features (shape-aware when a shape is available).
                 spatial_feats = calculate_distance_features_with_shape(
                     vp_position,
                     stop_payload,
@@ -328,43 +396,77 @@ def build_vp_training_dataset(
                     total_segments=trip_total_segments
                 )
 
-                actual_arrival = find_actual_arrival_time(
+                # --- Dual arrival target -------------------------------------
+                actual_arrival_computed = find_actual_arrival_time(
                     future_vps,
                     stop_row['stop_lat'],
                     stop_row['stop_lon'],
-                    distance_threshold=distance_threshold
+                    distance_threshold=distance_threshold,
                 )
-                
-                # Only include if we found an actual arrival
-                if actual_arrival is not None:
-                    row_data = {
-                        'trip_id': trip_id,
-                        'route_id': vp_row['route_id'],
-                        'vehicle_id': vp_row['vehicle_id'],
-                        'vp_ts': vp_ts,
-                        'vp_lat': vp_lat,
-                        'vp_lon': vp_lon,
-                        'vp_bearing': vp_row.get('bearing'),
-                        'vp_speed': vp_row.get('speed'),
-                        'stop_id': stop_row['stop_id'],
-                        'stop_sequence': stop_row['stop_sequence'],
-                        'stop_lat': stop_row['stop_lat'],
-                        'stop_lon': stop_row['stop_lon'],
-                        'progress_on_segment': spatial_feats.get('progress_on_segment'),
-                        'progress_ratio': spatial_feats.get('progress_ratio'),
-                        'distance_to_stop': spatial_feats.get('distance_to_stop'),
-                        'scheduled_arrival': stop_row['arrival_time'],
-                        'actual_arrival': actual_arrival,
-                    }
+                actual_arrival_stopped_at = find_stopped_at_arrival(
+                    future_vps,
+                    stop_row['stop_id'],
+                    stop_row['stop_sequence'],
+                )
+                primary_arrival = (
+                    actual_arrival_computed if arrival_source == "computed"
+                    else actual_arrival_stopped_at
+                )
+                # Keep the row only when the chosen primary arrival exists.
+                if primary_arrival is None:
+                    continue
 
-                    # Add shape-specific features if available
-                    if use_shapes and trip_shape is not None:
-                        row_data.update({
-                            'distance_to_stop': spatial_feats.get('shape_distance_to_stop'),
-                            'cross_track_error': spatial_feats.get('cross_track_error'),
-                        })
-                    
-                    training_rows.append(row_data)
+                # --- Derived features ----------------------------------------
+                bearing_to_stop = _initial_bearing(
+                    float(vp_lat), float(vp_lon),
+                    float(stop_row['stop_lat']), float(stop_row['stop_lon']),
+                )
+                vp_bearing = vp_row.get('bearing')
+                stops_ahead = int(stop_row['stop_order'] - closest_stop_order)
+
+                closest_arr_sec = _seconds_of_day(
+                    trip_stops.loc[closest_stop_idx, 'arrival_time']
+                )
+                tgt_arr_sec = _seconds_of_day(stop_row['arrival_time'])
+                scheduled_travel_time = None
+                if closest_arr_sec is not None and tgt_arr_sec is not None:
+                    delta = tgt_arr_sec - closest_arr_sec
+                    scheduled_travel_time = delta if delta >= 0 else None
+
+                training_rows.append({
+                    'trip_id': trip_id,
+                    'route_id': vp_row['route_id'],
+                    'vehicle_id': vp_row['vehicle_id'],
+                    'vp_ts': vp_ts,
+                    'vp_lat': vp_lat,
+                    'vp_lon': vp_lon,
+                    'vp_bearing': vp_bearing,
+                    'vp_speed': vp_row.get('speed'),
+                    'stop_id': stop_row['stop_id'],
+                    'stop_sequence': stop_row['stop_sequence'],
+                    'stop_lat': stop_row['stop_lat'],
+                    'stop_lon': stop_row['stop_lon'],
+                    # spatial
+                    'distance_to_stop': spatial_feats.get('distance_to_stop'),
+                    'distance_to_next_stop': spatial_feats.get('distance_to_next_stop'),
+                    'shape_distance_to_stop': spatial_feats.get('shape_distance_to_stop'),
+                    'shape_progress': spatial_feats.get('shape_progress'),
+                    'cross_track_error': spatial_feats.get('cross_track_error'),
+                    'progress_ratio': spatial_feats.get('progress_ratio'),
+                    'stops_ahead': stops_ahead,
+                    # kinematic
+                    'bearing_to_stop': bearing_to_stop,
+                    'bearing_diff': _angle_diff(vp_bearing, bearing_to_stop),
+                    # status
+                    'is_at_stop': bool(vp_row.get('current_status') == "STOPPED_AT"),
+                    # schedule
+                    'scheduled_arrival': stop_row['arrival_time'],
+                    'scheduled_travel_time': scheduled_travel_time,
+                    # target (both sources + canonical primary)
+                    'actual_arrival_computed': actual_arrival_computed,
+                    'actual_arrival_stopped_at': actual_arrival_stopped_at,
+                    'actual_arrival': primary_arrival,
+                })
     
     if not training_rows:
         ui.note("No training rows generated (no detected arrivals) — nothing to build.")
@@ -375,17 +477,24 @@ def build_vp_training_dataset(
     # ============================================================
     # STEP 5: Compute time_to_arrival_seconds
     # ============================================================
-    with ui.step("Compute time-to-arrival target") as s:
-        # Convert timestamps to datetime
+    with ui.step(f"Compute time-to-arrival target (primary={arrival_source})") as s:
+        # Normalise all arrival timestamps to UTC datetimes.
         df['vp_ts'] = pd.to_datetime(df['vp_ts'], utc=True)
-        df['actual_arrival'] = pd.to_datetime(df['actual_arrival'], utc=True)
+        for col in ('actual_arrival', 'actual_arrival_computed', 'actual_arrival_stopped_at'):
+            df[col] = pd.to_datetime(df[col], utc=True)
 
-        # Compute time to arrival (prediction target)
+        # Both sources + the canonical target (driven by arrival_source).
+        df['time_to_arrival_seconds_computed'] = (
+            df['actual_arrival_computed'] - df['vp_ts']
+        ).dt.total_seconds()
+        df['time_to_arrival_seconds_stopped_at'] = (
+            df['actual_arrival_stopped_at'] - df['vp_ts']
+        ).dt.total_seconds()
         df['time_to_arrival_seconds'] = (
             df['actual_arrival'] - df['vp_ts']
         ).dt.total_seconds()
 
-        # Filter out negative or unrealistic values
+        # Filter on the canonical target only (the trained target).
         initial_count = len(df)
         df = df[
             (df['time_to_arrival_seconds'] >= 0) &
@@ -411,6 +520,13 @@ def build_vp_training_dataset(
             df[k] = tf[k].values
         else:
             df[k] = np.nan
+
+    # Cyclical encodings (continuous, no artificial 23->0 / Sun->Mon jump) —
+    # helpful for linear/poly models and LSTMs alike.
+    df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24.0)
+    df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24.0)
+    df["dow_sin"] = np.sin(2 * np.pi * df["day_of_week"] / 7.0)
+    df["dow_cos"] = np.cos(2 * np.pi * df["day_of_week"] / 7.0)
     
     # ============================================================
     # STEP 7: Operational features
@@ -426,61 +542,39 @@ def build_vp_training_dataset(
         df['current_speed_kmh'] = np.nan
     
     # ============================================================
-    # STEP 8: Weather features
+    # STEP 8: Weather features — STUB (intentionally disabled)
     # ============================================================
-    # def _get_weather_for_row(row):
-    #     """Wraps fetch_weather with error handling for use in df.apply."""
-    #     try:
-    #         w = fetch_weather(
-    #             float(row['vp_lat']),
-    #             float(row['vp_lon']),
-    #             row['vp_ts'].to_pydatetime()
-    #         )
-    #         return w or {}
-    #     except Exception:
-    #         return {}
+    # Weather needs rethinking (source, caching, leakage) and is out of scope.
+    # Re-add temperature_c / precipitation_mm / wind_speed_kmh here when ready,
+    # then register them in models.common.data.ETADataset.FEATURE_GROUPS.
+    # (See feature_engineering/weather.py.)
 
-    # if attach_weather:
-    #     print("\nStep 8: Fetching weather data...")
-        
-    #     weather_series = df.apply(_get_weather_for_row, axis=1)
-    #     wx_df = pd.json_normalize(weather_series)
-        
-    #     target_keys = ["temperature_c", "precipitation_mm", "wind_speed_kmh"]
-    #     for k in target_keys:
-    #         if k in wx_df.columns:
-    #             df[k] = wx_df[k].values
-    #         else:
-    #             df[k] = np.nan
-
-    #     print(f"  Finished fetching weather for {len(df):,} rows.")
-    # else:
-    #     df["temperature_c"] = np.nan
-    #     df["precipitation_mm"] = np.nan
-    #     df["wind_speed_kmh"] = np.nan
-        
     # ============================================================
     # STEP 9: Final column selection
     # ============================================================
     wanted_cols = [
+        # identifiers
         "trip_id", "route_id", "vehicle_id", "stop_id", "stop_sequence",
-        "vp_ts", "vp_lat", "vp_lon", "vp_bearing",
-        "stop_lat", "stop_lon",
-        "distance_to_stop", "progress_on_segment", "progress_ratio",
-        "actual_arrival", "time_to_arrival_seconds",
+        # position
+        "vp_ts", "vp_lat", "vp_lon", "vp_bearing", "stop_lat", "stop_lon",
+        # spatial
+        "distance_to_stop", "distance_to_next_stop", "shape_distance_to_stop",
+        "shape_progress", "cross_track_error", "progress_ratio", "stops_ahead",
+        # kinematic
+        "current_speed_kmh", "bearing_to_stop", "bearing_diff",
+        # status
+        "is_at_stop",
+        # schedule
+        "scheduled_arrival", "scheduled_travel_time",
+        # target (dual source + canonical)
+        "actual_arrival_computed", "actual_arrival_stopped_at", "actual_arrival",
+        "time_to_arrival_seconds_computed", "time_to_arrival_seconds_stopped_at",
+        "time_to_arrival_seconds",
+        # temporal
         "hour", "day_of_week", "is_weekend", "is_holiday", "is_peak_hour",
-        "current_speed_kmh",
-        "temperature_c", "precipitation_mm", "wind_speed_kmh",
+        "hour_sin", "hour_cos", "dow_sin", "dow_cos",
     ]
-    
-    # Add shape features if they were computed
-    # if use_shapes:
-    # wanted_cols.extend([
-    #     "shape_progress",
-    #     "shape_distance_to_stop", 
-    #     "cross_track_error",
-    # ])
-    
+
     for c in wanted_cols:
         if c not in df.columns:
             df[c] = np.nan
@@ -488,6 +582,10 @@ def build_vp_training_dataset(
     result = df[wanted_cols].reset_index(drop=True)
 
     _avg_tta = result['time_to_arrival_seconds'].mean()
+    _stopped_cov = (
+        100.0 * result['actual_arrival_stopped_at'].notna().mean()
+        if len(result) else 0.0
+    )
     ui.summary(
         "Dataset ready",
         [
@@ -496,7 +594,9 @@ def build_vp_training_dataset(
             ("trips", f"{result['trip_id'].nunique():,}"),
             ("routes", f"{result['route_id'].nunique():,}"),
             ("stops", f"{result['stop_id'].nunique():,}"),
+            ("target", f"{arrival_source}"),
             ("avg ETA", f"{_avg_tta:.0f}s ({_avg_tta / 60:.1f} min)"),
+            ("stopped_at cov", f"{_stopped_cov:.1f}%"),
         ],
     )
 

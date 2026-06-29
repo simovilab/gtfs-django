@@ -19,6 +19,11 @@ from rt_pipeline.storage import read_vehicle_positions
 # The exact schema the legacy ORM path produced (order matters downstream).
 LEGACY_COLUMNS = ["trip_id", "vehicle_id", "ts", "lat", "lon", "bearing", "speed"]
 
+# Extra RT fields the dataset builder needs for STOPPED_AT-based arrival and the
+# is_at_stop feature. Absent on pre-capture parquet -> surfaced as null.
+EXTRA_COLUMNS = ["current_stop_sequence", "current_status", "stop_id"]
+OUTPUT_COLUMNS = LEGACY_COLUMNS + EXTRA_COLUMNS
+
 
 def fetch_vehicle_positions(
     route_ids: Optional[List[str]] = None,
@@ -42,14 +47,16 @@ def fetch_vehicle_positions(
         config=config,
     )
     if df.empty:
-        return pd.DataFrame(columns=LEGACY_COLUMNS)
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
 
     df = df[df["trip_id"].notna() & df["lat"].notna() & df["lon"].notna()]
     if df.empty:
-        return pd.DataFrame(columns=LEGACY_COLUMNS)
+        return pd.DataFrame(columns=OUTPUT_COLUMNS)
 
+    # reindex (not slice) so pre-capture parquet missing current_status/stop_id
+    # gets them as null columns instead of raising KeyError.
     return (
-        df[LEGACY_COLUMNS]
+        df.reindex(columns=OUTPUT_COLUMNS)
         .sort_values(["trip_id", "ts"])
         .reset_index(drop=True)
     )

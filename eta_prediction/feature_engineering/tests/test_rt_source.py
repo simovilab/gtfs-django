@@ -11,7 +11,7 @@ import datetime as dt
 
 import pandas as pd
 
-from feature_engineering.rt_source import LEGACY_COLUMNS, fetch_vehicle_positions
+from feature_engineering.rt_source import OUTPUT_COLUMNS, fetch_vehicle_positions
 from rt_pipeline.storage import write_vehicle_positions
 
 
@@ -29,6 +29,8 @@ def _sample(route_id: str, n: int, vp: str = "v", with_null_trip: bool = False):
             "route_id": [route_id] * n,
             "trip_id": [f"t{i}" for i in range(n)],
             "current_stop_sequence": list(range(n)),
+            "current_status": ["IN_TRANSIT_TO"] * n,
+            "stop_id": [f"s{i}" for i in range(n)],
             "ingested_at": [t0] * n,
         }
     )
@@ -41,7 +43,7 @@ def test_returns_legacy_schema_sorted(tmp_path):
     base = str(tmp_path / "vp")
     write_vehicle_positions(_sample("Green-D", 4), base)
     out = fetch_vehicle_positions(base_uri=base)
-    assert list(out.columns) == LEGACY_COLUMNS
+    assert list(out.columns) == OUTPUT_COLUMNS
     assert out["ts"].is_monotonic_increasing  # single trip ordering proxy
     assert len(out) == 4
 
@@ -66,4 +68,4 @@ def test_drops_null_trip_id(tmp_path):
 def test_empty_dataset(tmp_path):
     out = fetch_vehicle_positions(base_uri=str(tmp_path / "none"))
     assert out.empty
-    assert list(out.columns) == LEGACY_COLUMNS
+    assert list(out.columns) == OUTPUT_COLUMNS

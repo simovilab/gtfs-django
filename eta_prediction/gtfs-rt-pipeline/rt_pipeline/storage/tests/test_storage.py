@@ -36,6 +36,8 @@ def _sample(route_id: str, day: int, n: int, vehicle_prefix: str = "v") -> pd.Da
             "route_id": [route_id] * n,
             "trip_id": [f"trip-{i}" for i in range(n)],
             "current_stop_sequence": list(range(n)),
+            "current_status": ["IN_TRANSIT_TO"] * n,
+            "stop_id": [f"stop-{i}" for i in range(n)],
             "ingested_at": [base] * n,
         }
     )

@@ -37,6 +37,8 @@ DATA_COLUMNS = (
     "speed",
     "trip_id",
     "current_stop_sequence",
+    "current_status",  # VehicleStopStatus name (e.g. STOPPED_AT); null on old data
+    "stop_id",         # stop the status refers to; null on old data
     "ingested_at",
 )
 

@@ -90,6 +90,11 @@ class Command(BaseCommand):
             df = pd.DataFrame.from_records(list(qs.values(*VP_FIELDS)))
             n = len(df)
             if n:
+                # The Postgres VP model predates current_status/stop_id; write
+                # them as null so the parquet schema stays consistent.
+                for _col in ("current_status", "stop_id"):
+                    if _col not in df.columns:
+                        df[_col] = None
                 if dry:
                     self.stdout.write(f"[dry-run] {day.date()}: {n} rows")
                 else:

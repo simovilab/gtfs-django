@@ -27,6 +27,8 @@ def _records():
             "route_id": "Green-D",
             "trip_id": "t1",
             "current_stop_sequence": 1,
+            "current_status": "IN_TRANSIT_TO",
+            "stop_id": "s1",
             "ingested_at": t,
         }
     ]
