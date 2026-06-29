@@ -54,9 +54,17 @@ def s3_base_uri(bucket: str = BUCKET, prefix: str = BASE_PREFIX) -> str:
 def add_partition_columns(df: pd.DataFrame, ts_col: str = "ts") -> pd.DataFrame:
     """Return a copy of ``df`` with year/month/day derived from ``ts_col``.
 
+    Partition keys are ALWAYS computed in UTC, so the same observation lands in
+    the same ``year/month/day`` cell no matter where the poller runs (Boston,
+    Germany, …). ``ts`` is the GTFS-RT feed/vehicle timestamp (epoch → UTC); a
+    tz-naive value is interpreted as UTC rather than as the host's local time —
+    this is the invariant that keeps multi-host polling consistent.
+
     Immutable: never mutates the input frame.
     """
     out = df.copy()
+    # utc=True converts tz-aware values to UTC and localizes tz-naive ones AS
+    # UTC (never the local zone) — the cross-host determinism guarantee.
     ts = pd.to_datetime(out[ts_col], utc=True)
     out["year"] = ts.dt.year.astype("int64")
     out["month"] = ts.dt.month.astype("int64")
