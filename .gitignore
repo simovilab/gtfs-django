@@ -330,6 +330,8 @@ yarn-error.log*
 # Built datasets, except the committed sample fixtures.
 eta_prediction/datasets/*.parquet
 !eta_prediction/datasets/sample.parquet
+# Local VehiclePosition cache materialized from S3 (regenerable; never commit).
+eta_prediction/datasets/vp_cache/
 # Trained model registry artifacts (retrainable outputs).
 eta_prediction/models/trained/
 # Runtime profiling output (bytewax/profiling samples remain tracked).
