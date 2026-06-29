@@ -13,6 +13,7 @@ from feature_engineering.rt_source import fetch_vehicle_positions
 from feature_engineering.temporal import extract_temporal_features
 from feature_engineering.spatial import calculate_distance_features_with_shape, load_shape_for_trip
 from feature_engineering.weather import fetch_weather
+from feature_engineering import progress as ui
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -121,66 +122,56 @@ def build_vp_training_dataset(
         - weather features (temperature, precipitation, wind_speed)
     """
     
-    print("=" * 70)
-    print("VP-BASED DATASET BUILDER")
-    if use_shapes:
-        print("  Shape-informed progress: ENABLED")
-    print("=" * 70)
-    
+    _banner_lines = []
+    if route_ids:
+        _banner_lines.append(f"routes   {', '.join(route_ids)}")
+    if start_date and end_date:
+        _banner_lines.append(f"window   {start_date.date()} → {end_date.date()}")
+    _banner_lines.append(f"shapes   {'enabled' if use_shapes else 'disabled'}")
+    ui.banner("ETA dataset builder · VehiclePositions", _banner_lines)
+
     # Setup database connection for shape loading
     if use_shapes and pg_conn is None:
         try:
             django_connection.ensure_connection()
             pg_conn = django_connection.connection
-            print("  Using Django database connection for shape loading")
         except Exception as exc:
-            print(f"  WARNING: Could not establish DB connection ({exc})")
-            print("           Shape features will be disabled")
+            ui.note(f"DB connection unavailable ({exc}) — shape features disabled")
             use_shapes = False
     
     # ============================================================
     # STEP 1: Fetch VehiclePositions
     # ============================================================
-    print("\nStep 1: Fetching VehiclePositions (S3 Hive-partitioned Parquet)...")
-    if route_ids:
-        print(f"  Route partition filter: {route_ids}")
-    if start_date:
-        print(f"  start_date >= {start_date}")
-    if end_date:
-        print(f"  end_date < {end_date}")
-
     # RT now comes from the S3 store (route + date partition pushdown), not the
     # live Postgres ORM. Returns the same columns the rest of this builder uses.
-    vp_df = fetch_vehicle_positions(
-        route_ids=route_ids,
-        start=start_date,
-        end=end_date,
-        base_uri=vp_source_uri,
-    )
-    print(f"  Retrieved {len(vp_df):,} VehiclePosition records from S3")
-    
+    with ui.step("Fetch VehiclePositions from S3") as s:
+        vp_df = fetch_vehicle_positions(
+            route_ids=route_ids,
+            start=start_date,
+            end=end_date,
+            base_uri=vp_source_uri,
+        )
+        s.detail(f"{len(vp_df):,} records")
+
     if vp_df.empty:
-        print("\nWARNING: No VehiclePosition data found!")
+        ui.note("No VehiclePosition data found for this filter — nothing to build.")
         return pd.DataFrame()
     
     # ============================================================
     # STEP 2: Get trip metadata
     # ============================================================
-    print("\nStep 2: Getting trip metadata...")
-    
-    trip_ids = vp_df['trip_id'].unique()
-    trips_data = Trip.objects.filter(trip_id__in=trip_ids).values(
-        'trip_id', 'route_id', 'direction_id', 'trip_headsign', 'service_id'
-    )
-    trips_df = pd.DataFrame.from_records(trips_data)
-    
-    vp_df = vp_df.merge(trips_df, on='trip_id', how='left')
-    print(f"  Added route info for {len(vp_df):,} records")
-    
-    # Drop VPs without route info
-    initial_count = len(vp_df)
-    vp_df = vp_df.dropna(subset=['route_id'])
-    print(f"  Dropped {initial_count - len(vp_df):,} VPs without route info")
+    with ui.step("Join trip metadata") as s:
+        trip_ids = vp_df['trip_id'].unique()
+        trips_data = Trip.objects.filter(trip_id__in=trip_ids).values(
+            'trip_id', 'route_id', 'direction_id', 'trip_headsign', 'service_id'
+        )
+        trips_df = pd.DataFrame.from_records(trips_data)
+
+        vp_df = vp_df.merge(trips_df, on='trip_id', how='left')
+        # Drop VPs without route info
+        initial_count = len(vp_df)
+        vp_df = vp_df.dropna(subset=['route_id'])
+        s.detail(f"{len(vp_df):,} VPs matched · {initial_count - len(vp_df):,} dropped")
     
     # ============================================================
     # STEP 2b: Load shapes for trips (if enabled)
@@ -188,78 +179,74 @@ def build_vp_training_dataset(
     shape_cache: Dict[str, Any] = {}
     
     if use_shapes:
-        print("\nStep 2b: Loading GTFS shapes for trips...")
         unique_trip_ids = vp_df['trip_id'].unique()
         loaded_count = 0
         failed_count = 0
-        
-        for trip_id in unique_trip_ids:
-            try:
-                shape = load_shape_for_trip(trip_id, pg_conn)
-                if shape is not None:
-                    shape_cache[trip_id] = shape
-                    loaded_count += 1
-            except Exception as exc:
-                # Silently skip trips without shapes
-                failed_count += 1
-                continue
-        
-        print(f"  Loaded shapes for {loaded_count:,} trips")
+
+        with ui.bar(len(unique_trip_ids), "Load GTFS shapes") as b:
+            for trip_id in unique_trip_ids:
+                try:
+                    shape = load_shape_for_trip(trip_id, pg_conn)
+                    if shape is not None:
+                        shape_cache[trip_id] = shape
+                        loaded_count += 1
+                except Exception:
+                    # Silently skip trips without shapes
+                    failed_count += 1
+                finally:
+                    b.advance(detail=f"{loaded_count:,} loaded")
         if failed_count > 0:
-            print(f"  Skipped {failed_count:,} trips without shapes")
+            ui.note(f"{failed_count:,} trips had no shape (skipped)")
     
     # ============================================================
     # STEP 3: Get stop sequences for each trip
     # ============================================================
-    print("\nStep 3: Loading stop sequences for trips...")
-    
-    stoptimes_data = StopTime.objects.filter(
-        trip_id__in=trip_ids
-    ).values(
-        'trip_id',
-        'stop_sequence',
-        'stop_id',
-        'arrival_time',
-    ).order_by('trip_id', 'stop_sequence')
-    
-    st_df = pd.DataFrame.from_records(stoptimes_data)
-    print(f"  Retrieved {len(st_df):,} StopTime records")
-    
-    if st_df.empty:
-        print("\nWARNING: No StopTime data found!")
-        return pd.DataFrame()
-    
-    # Get stop coordinates
-    stop_ids = st_df['stop_id'].unique()
-    # remove any NaN / None values and coerce to STRING
-    stop_ids = [str(s) for s in stop_ids if pd.notna(s)]
+    with ui.step("Load stop sequences + coordinates") as s:
+        stoptimes_data = StopTime.objects.filter(
+            trip_id__in=trip_ids
+        ).values(
+            'trip_id',
+            'stop_sequence',
+            'stop_id',
+            'arrival_time',
+        ).order_by('trip_id', 'stop_sequence')
 
-    stops_data = Stop.objects.filter(stop_id__in=stop_ids).values(
-        'stop_id', 'stop_lat', 'stop_lon', 'stop_name'
-    )
-    stops_df = pd.DataFrame.from_records(stops_data)
+        st_df = pd.DataFrame.from_records(stoptimes_data)
 
-    st_df = st_df.merge(stops_df, on='stop_id', how='left')
-    print(f"  Added coordinates for {st_df['stop_lat'].notna().sum():,} stops")
+        if st_df.empty:
+            ui.note("No StopTime data found — is the schedule imported?")
+            return pd.DataFrame()
+
+        # Get stop coordinates
+        stop_ids = st_df['stop_id'].unique()
+        # remove any NaN / None values and coerce to STRING
+        stop_ids = [str(s) for s in stop_ids if pd.notna(s)]
+
+        stops_data = Stop.objects.filter(stop_id__in=stop_ids).values(
+            'stop_id', 'stop_lat', 'stop_lon', 'stop_name'
+        )
+        stops_df = pd.DataFrame.from_records(stops_data)
+
+        st_df = st_df.merge(stops_df, on='stop_id', how='left')
+        s.detail(
+            f"{len(st_df):,} stop-times · {st_df['stop_lat'].notna().sum():,} geocoded"
+        )
     
     # ============================================================
     # STEP 4: For each VP, find remaining stops and distances
     # ============================================================
-    print(f"\nStep 4: Calculating distances to remaining stops (max {max_stops_ahead})...")
-    
     training_rows = []
-    total_vps = len(vp_df)
-    
+
     # Group VPs by trip for efficient processing
     vp_grouped = vp_df.groupby('trip_id')
     st_grouped = st_df.groupby('trip_id')
-    
-    processed_trips = 0
-    for trip_id, trip_vps in vp_grouped:
-        processed_trips += 1
-        if processed_trips % 100 == 0:
-            print(f"  Processing trip {processed_trips}/{len(vp_grouped)} ({len(training_rows):,} rows generated)")
-        
+
+    for trip_id, trip_vps in ui.track(
+        vp_grouped,
+        vp_grouped.ngroups,
+        f"Match VPs → upcoming stops (≤{max_stops_ahead})",
+        detail=lambda: f"{len(training_rows):,} samples",
+    ):
         # Get stop sequence for this trip
         if trip_id not in st_grouped.groups:
             continue
@@ -379,53 +366,44 @@ def build_vp_training_dataset(
                     
                     training_rows.append(row_data)
     
-    print(f"  Generated {len(training_rows):,} training samples")
-    
     if not training_rows:
-        print("\nWARNING: No training rows generated!")
+        ui.note("No training rows generated (no detected arrivals) — nothing to build.")
         return pd.DataFrame()
-    
+
     df = pd.DataFrame(training_rows)
-    
+
     # ============================================================
     # STEP 5: Compute time_to_arrival_seconds
     # ============================================================
-    print("\nStep 5: Computing time_to_arrival_seconds...")
-    
-    # Convert timestamps to datetime
-    df['vp_ts'] = pd.to_datetime(df['vp_ts'], utc=True)
-    df['actual_arrival'] = pd.to_datetime(df['actual_arrival'], utc=True)
-    
-    # Compute time to arrival (prediction target)
-    df['time_to_arrival_seconds'] = (
-        df['actual_arrival'] - df['vp_ts']
-    ).dt.total_seconds()
-    
-    # Filter out negative or unrealistic values
-    initial_count = len(df)
-    df = df[
-        (df['time_to_arrival_seconds'] >= 0) &
-        (df['time_to_arrival_seconds'] <= 7200)  # Max 2 hours ahead
-    ]
-    print(f"  Dropped {initial_count - len(df):,} rows with invalid time_to_arrival")
-    print(f"  Remaining: {len(df):,} rows")
+    with ui.step("Compute time-to-arrival target") as s:
+        # Convert timestamps to datetime
+        df['vp_ts'] = pd.to_datetime(df['vp_ts'], utc=True)
+        df['actual_arrival'] = pd.to_datetime(df['actual_arrival'], utc=True)
+
+        # Compute time to arrival (prediction target)
+        df['time_to_arrival_seconds'] = (
+            df['actual_arrival'] - df['vp_ts']
+        ).dt.total_seconds()
+
+        # Filter out negative or unrealistic values
+        initial_count = len(df)
+        df = df[
+            (df['time_to_arrival_seconds'] >= 0) &
+            (df['time_to_arrival_seconds'] <= 7200)  # Max 2 hours ahead
+        ]
+        s.detail(f"{len(df):,} valid · {initial_count - len(df):,} out-of-range dropped")
     
     # ============================================================
     # STEP 6: Temporal features
     # ============================================================
-    print("\nStep 6: Extracting temporal features...")
-    
     temporal_data = []
-    for idx, ts in enumerate(df['vp_ts']):
-        if idx % 10000 == 0 and idx > 0:
-            print(f"  Processed {idx:,}/{len(df):,} temporal features")
-        
+    for ts in ui.track(df['vp_ts'], len(df), "Extract temporal features"):
         try:
             feats = extract_temporal_features(ts, tz=tz_for_temporal, region="US_MA")
             temporal_data.append(feats)
         except Exception:
             temporal_data.append({})
-    
+
     tf = pd.DataFrame(temporal_data)
     keep_temporal = ["hour", "day_of_week", "is_weekend", "is_holiday", "is_peak_hour"]
     for k in keep_temporal:
@@ -450,42 +428,40 @@ def build_vp_training_dataset(
     # ============================================================
     # STEP 8: Weather features
     # ============================================================
-    def _get_weather_for_row(row):
-        """Wraps fetch_weather with error handling for use in df.apply."""
-        try:
-            w = fetch_weather(
-                float(row['vp_lat']),
-                float(row['vp_lon']),
-                row['vp_ts'].to_pydatetime()
-            )
-            return w or {}
-        except Exception:
-            return {}
+    # def _get_weather_for_row(row):
+    #     """Wraps fetch_weather with error handling for use in df.apply."""
+    #     try:
+    #         w = fetch_weather(
+    #             float(row['vp_lat']),
+    #             float(row['vp_lon']),
+    #             row['vp_ts'].to_pydatetime()
+    #         )
+    #         return w or {}
+    #     except Exception:
+    #         return {}
 
-    if attach_weather:
-        print("\nStep 8: Fetching weather data...")
+    # if attach_weather:
+    #     print("\nStep 8: Fetching weather data...")
         
-        weather_series = df.apply(_get_weather_for_row, axis=1)
-        wx_df = pd.json_normalize(weather_series)
+    #     weather_series = df.apply(_get_weather_for_row, axis=1)
+    #     wx_df = pd.json_normalize(weather_series)
         
-        target_keys = ["temperature_c", "precipitation_mm", "wind_speed_kmh"]
-        for k in target_keys:
-            if k in wx_df.columns:
-                df[k] = wx_df[k].values
-            else:
-                df[k] = np.nan
+    #     target_keys = ["temperature_c", "precipitation_mm", "wind_speed_kmh"]
+    #     for k in target_keys:
+    #         if k in wx_df.columns:
+    #             df[k] = wx_df[k].values
+    #         else:
+    #             df[k] = np.nan
 
-        print(f"  Finished fetching weather for {len(df):,} rows.")
-    else:
-        df["temperature_c"] = np.nan
-        df["precipitation_mm"] = np.nan
-        df["wind_speed_kmh"] = np.nan
+    #     print(f"  Finished fetching weather for {len(df):,} rows.")
+    # else:
+    #     df["temperature_c"] = np.nan
+    #     df["precipitation_mm"] = np.nan
+    #     df["wind_speed_kmh"] = np.nan
         
     # ============================================================
     # STEP 9: Final column selection
     # ============================================================
-    print("\nStep 9: Preparing final dataset...")
-    
     wanted_cols = [
         "trip_id", "route_id", "vehicle_id", "stop_id", "stop_sequence",
         "vp_ts", "vp_lat", "vp_lon", "vp_bearing",
@@ -510,22 +486,20 @@ def build_vp_training_dataset(
             df[c] = np.nan
     
     result = df[wanted_cols].reset_index(drop=True)
-    
-    print("\n" + "=" * 70)
-    print(f"✓ Final dataset: {len(result):,} rows × {len(wanted_cols)} columns")
-    print(f"  Unique trips: {result['trip_id'].nunique():,}")
-    print(f"  Unique routes: {result['route_id'].nunique():,}")
-    print(f"  Unique stops: {result['stop_id'].nunique():,}")
-    print(f"  Avg time_to_arrival: {result['time_to_arrival_seconds'].mean():.1f}s ({result['time_to_arrival_seconds'].mean()/60:.1f} min)")
-    
-    # if use_shapes:
-    #     shape_coverage = result['shape_progress'].notna().sum() / len(result) * 100
-    #     print(f"  Shape coverage: {shape_coverage}%")
-    #     if shape_coverage > 0:
-    #         print(f"  Avg cross-track error: {result['cross_track_error'].mean():.1f}m")
-    
-    print("=" * 70)
-    
+
+    _avg_tta = result['time_to_arrival_seconds'].mean()
+    ui.summary(
+        "Dataset ready",
+        [
+            ("rows", f"{len(result):,}"),
+            ("columns", f"{len(wanted_cols)}"),
+            ("trips", f"{result['trip_id'].nunique():,}"),
+            ("routes", f"{result['route_id'].nunique():,}"),
+            ("stops", f"{result['stop_id'].nunique():,}"),
+            ("avg ETA", f"{_avg_tta:.0f}s ({_avg_tta / 60:.1f} min)"),
+        ],
+    )
+
     return result
 
 
@@ -536,6 +510,6 @@ def save_dataset(df: pd.DataFrame, output_path: str):
     # Create parent directory if it doesn't exist
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"\nSaving to {output_path}...")
-    df.to_parquet(output_path, compression="snappy", index=False)
-    print(f"✓ Saved {len(df):,} rows")
+    with ui.step(f"Save → {output_path}") as s:
+        df.to_parquet(output_path, compression="snappy", index=False)
+        s.detail(f"{len(df):,} rows")
