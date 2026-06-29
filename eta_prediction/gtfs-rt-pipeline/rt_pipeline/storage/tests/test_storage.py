@@ -113,6 +113,20 @@ def test_list_partitions_and_routes(tmp_path):
     assert available_routes(base_uri=base) == ["Green-D", "Green-E"]
 
 
+def test_read_dedups_concurrent_writer_duplicates(tmp_path):
+    base = str(tmp_path / "vp")
+    # Two pollers capture the same feed snapshot -> identical (vehicle_id, ts).
+    write_vehicle_positions(_sample("Green-D", 2, 4), base)
+    write_vehicle_positions(_sample("Green-D", 2, 4), base)
+
+    deduped = read_vehicle_positions(route_ids=["Green-D"], base_uri=base)
+    assert len(deduped) == 4
+    assert deduped.duplicated(subset=["vehicle_id", "ts"]).sum() == 0
+
+    raw = read_vehicle_positions(route_ids=["Green-D"], base_uri=base, dedup=False)
+    assert len(raw) == 8
+
+
 def test_empty_df_writes_nothing(tmp_path):
     base = str(tmp_path / "vp")
     assert write_vehicle_positions(pd.DataFrame(), base) == 0

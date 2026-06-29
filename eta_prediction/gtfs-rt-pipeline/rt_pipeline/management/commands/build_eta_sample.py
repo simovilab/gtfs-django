@@ -93,6 +93,15 @@ class Command(BaseCommand):
             type=str,
             help="End date (YYYY-MM-DD format, overrides --days)"
         )
+        parser.add_argument(
+            "--vp-source-uri",
+            type=str,
+            help=(
+                "Override the S3 base URI for VehiclePosition parquet "
+                "(default: settings.S3_VP_BASE_URI or "
+                "s3://transit/feeds/mbta/vehicle_positions)"
+            ),
+        )
 
     def handle(self, *args, **opts):
         n = opts["top_routes"]
@@ -170,28 +179,17 @@ class Command(BaseCommand):
         self.stdout.write(f"  Output: {out}")
         self.stdout.write("="*60 + "\n")
 
-        # Check for VehiclePosition data
-        from rt_pipeline.models import VehiclePosition
-        vp_count = VehiclePosition.objects.filter(
-            ts__gte=start,
-            ts__lt=end
-        ).count()
-        
-        if vp_count == 0:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"No VehiclePosition data found in date range {start.date()} to {end.date()}\n"
-                    "Check data availability:\n"
-                    "  python manage.py shell -c 'from rt_pipeline.models import VehiclePosition; "
-                    "from django.db.models import Min, Max; "
-                    "print(VehiclePosition.objects.aggregate(min=Min(\"ts\"), max=Max(\"ts\")))'"
-                )
+        # VehiclePositions are read from the S3 Hive-partitioned Parquet store
+        # (not Postgres). Resolution: --vp-source-uri > settings.S3_VP_BASE_URI >
+        # the storage default (s3://transit/feeds/mbta/vehicle_positions).
+        vp_source_uri = opts.get("vp_source_uri") or getattr(
+            settings, "S3_VP_BASE_URI", ""
+        ) or None
+        self.stdout.write(
+            self.style.NOTICE(
+                f"  VP source: {vp_source_uri or 's3 default (transit/feeds/mbta/vehicle_positions)'}"
             )
-            return
-        else:
-            self.stdout.write(
-                self.style.SUCCESS(f"Found {vp_count:,} VehiclePosition records in date range")
-            )
+        )
 
         # Build dataset
         try:
@@ -205,6 +203,7 @@ class Command(BaseCommand):
                 # min_observations_per_stop=min_obs,
                 # vp_sample_interval_seconds=vp_sample_interval,
                 attach_weather=attach_weather,
+                vp_source_uri=vp_source_uri,
             )
         except Exception as e:
             self.stdout.write(
@@ -218,22 +217,23 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.WARNING(
                     "Resulting dataset is empty. Possible issues:\n"
-                    "  1. No VehiclePosition data in the date range\n"
+                    "  1. No VehiclePosition data in the date range for these routes\n"
                     "  2. VPs not matching any trips with stop sequences\n"
                     "  3. Vehicles never came close enough to stops (try increasing --distance-threshold)\n"
                     "  4. All data filtered out by --min-observations threshold\n"
                     "  5. No future VPs available to detect arrivals (incomplete trips)\n"
-                    "\nDebug queries:\n"
-                    "  - Check VP count: python manage.py shell -c 'from rt_pipeline.models import VehiclePosition; print(VehiclePosition.objects.count())'\n"
-                    "  - Check date range: python manage.py shell -c 'from rt_pipeline.models import VehiclePosition; from django.db.models import Min, Max; print(VehiclePosition.objects.aggregate(min=Min(\"ts\"), max=Max(\"ts\")))'\n"
-                    "  - Check StopTime data: python manage.py shell -c 'from sch_pipeline.models import StopTime, Stop; print(f\"StopTimes: {StopTime.objects.count()}, Stops with coords: {Stop.objects.exclude(stop_lat__isnull=True).count()}\")'\n"
+                    "\nDebug:\n"
+                    f"  - VP source (S3): {vp_source_uri or 's3 default (transit/feeds/mbta/vehicle_positions)'}\n"
+                    "  - List partitions/routes present in the store:\n"
+                    "      python manage.py shell -c 'from rt_pipeline.storage import list_partitions; print(list_partitions())'\n"
+                    "  - Check schedule is loaded:\n"
+                    "      python manage.py shell -c 'from sch_pipeline.models import StopTime, Stop; "
+                    "print(\"StopTimes:\", StopTime.objects.count(), \"Stops w/ coords:\", Stop.objects.exclude(stop_lat__isnull=True).count())'\n"
                     "\nTry adjusting parameters:\n"
-                    "  - Increase --distance-threshold (current: {})m\n"
-                    "  - Reduce --min-observations (current: {})\n"
-                    "  - Increase --max-stops-ahead (current: {})\n"
-                    "  - Set --vp-sample-interval to 0 to use all VPs".format(
-                        distance_threshold, min_obs, max_stops_ahead
-                    )
+                    f"  - Increase --distance-threshold (current: {distance_threshold})m\n"
+                    f"  - Reduce --min-observations (current: {min_obs})\n"
+                    f"  - Increase --max-stops-ahead (current: {max_stops_ahead})\n"
+                    "  - Set --vp-sample-interval to 0 to use all VPs"
                 )
             )
             return
