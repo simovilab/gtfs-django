@@ -83,25 +83,6 @@ docker compose exec web python manage.py build_eta_sample --route-ids Green-D,Gr
 # success log: "Step 1: Fetching VehiclePositions (S3 Hive-partitioned Parquet)..." / "Retrieved N ... from S3"
 ```
 
-## Faster builds: materialize a local VP cache first
-The poller writes one tiny parquet file per cycle, so each S3 partition holds
-thousands of ~2 KB objects and builds spend their time on S3 round-trips. The
-standalone `vp_cache.py` script reads the slice from S3 **once** (deduped),
-writes a local Hive-partitioned copy (one file/partition) under
-`datasets/vp_cache/` (git-ignored), then point the builder at it. It never
-mutates S3.
-```bash
-# from eta_prediction/ — reads gtfs-rt-pipeline/.env for AWS_* creds
-uv run --project gtfs-rt-pipeline python feature_engineering/vp_cache.py \
-    --route-ids 111,32,Blue --start 2026-06-28 --end 2026-06-29
-# build from the local cache (note relative path from gtfs-rt-pipeline/)
-docker compose exec web python manage.py build_eta_sample \
-    --route-ids 111,32,Blue --start-date 2026-06-28 --end-date 2026-06-29 \
-    --vp-source-uri ../datasets/vp_cache
-```
-Flags: `--source-uri` (default `$S3_VP_BASE_URI` or storage default), `--dest`
-(default `datasets/vp_cache`), `--no-refresh` (append instead of rebuild).
-
 ## Backfill existing Postgres VPs -> S3
 ```bash
 docker compose exec web python manage.py backfill_s3 --start 2026-06-01 --end 2026-06-29 [--route-ids Green-D,Green-E] [--dry-run]
