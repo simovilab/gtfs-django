@@ -41,8 +41,30 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
+def _initial_bearing(lat1, lon1, lat2, lon2):
+    """Initial great-circle bearing from point 1 to point 2, degrees 0-360."""
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dlambda = math.radians(lon2 - lon1)
+    y = math.sin(dlambda) * math.cos(phi2)
+    x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dlambda)
+    return (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
+
+
+def _angle_diff(a, b):
+    """Smallest absolute angular difference (0-180), None-safe."""
+    if a is None or b is None:
+        return None
+    d = abs(float(a) - float(b)) % 360.0
+    return d if d <= 180.0 else 360.0 - d
+
+
 def _progress_features(vehicle_position, stop, next_stop, total_segments_hint):
-    """Approximate distance/progress metrics without requiring shapes."""
+    """Distance/progress metrics computable online without route shapes.
+
+    Returns ``(distance_to_stop, distance_to_next_stop, progress_ratio)``. The
+    internal ``progress_on_segment`` only feeds ``progress_ratio`` and is not a
+    served feature anymore.
+    """
     vp_lat = vehicle_position["lat"]
     vp_lon = vehicle_position["lon"]
     stop_lat = stop["lat"]
@@ -78,7 +100,7 @@ def _progress_features(vehicle_position, stop, next_stop, total_segments_hint):
     denom = max(float(total_segments), 1.0)
     progress_ratio = max(0.0, min(1.0, (completed + progress_on_segment) / denom))
 
-    return distance_to_stop, progress_on_segment, progress_ratio
+    return distance_to_stop, distance_to_next, progress_ratio
 
 
 def _predict_with_model(model_key, model_type, features, distance_m):
@@ -113,40 +135,34 @@ def _predict_with_model(model_key, model_type, features, distance_m):
             distance_to_stop=distance_m
         )
 
-    elif model_type == 'polyreg_time':
-        from models.polyreg_time.predict import predict_eta
+    elif model_type in ('polyreg_time', 'xgboost'):
+        if model_type == 'polyreg_time':
+            from models.polyreg_time.predict import predict_eta
+        else:
+            from models.xgb.predict import predict_eta
+
         return predict_eta(
             model_key=model_key,
             distance_to_stop=distance_m,
-            progress_on_segment=features.get('progress_on_segment'),
+            distance_to_next_stop=features.get('distance_to_next_stop'),
+            shape_distance_to_stop=features.get('shape_distance_to_stop'),
+            shape_progress=features.get('shape_progress'),
+            cross_track_error=features.get('cross_track_error'),
             progress_ratio=features.get('progress_ratio'),
+            stops_ahead=features.get('stops_ahead'),
+            current_speed_kmh=features.get('current_speed_kmh'),
+            bearing_to_stop=features.get('bearing_to_stop'),
+            bearing_diff=features.get('bearing_diff'),
+            is_at_stop=features.get('is_at_stop'),
             hour=features.get('hour', 0),
             day_of_week=features.get('day_of_week', 0),
             is_peak_hour=features.get('is_peak_hour', False),
             is_weekend=features.get('is_weekend', False),
             is_holiday=features.get('is_holiday', False),
-            temperature_c=features.get('temperature_c', 25.0),
-            precipitation_mm=features.get('precipitation_mm', 0.0),
-            wind_speed_kmh=features.get('wind_speed_kmh')
-        )
-
-    # ✅ NEW XGBOOST BRANCH (consistent with xgb/predict.py)
-    elif model_type == 'xgboost':
-        from models.xgb.predict import predict_eta
-
-        return predict_eta(
-            model_key=model_key,
-            distance_to_stop=distance_m,
-            progress_on_segment=features.get('progress_on_segment'),
-            progress_ratio=features.get('progress_ratio'),
-            hour=features.get('hour', 0),
-            day_of_week=features.get('day_of_week', 0),
-            is_peak_hour=features.get('is_peak_hour', False),
-            is_weekend=features.get('is_weekend', False),
-            is_holiday=features.get('is_holiday', False),
-            temperature_c=features.get('temperature_c', 25.0),
-            precipitation_mm=features.get('precipitation_mm', 0.0),
-            wind_speed_kmh=features.get('wind_speed_kmh', None)
+            hour_sin=features.get('hour_sin'),
+            hour_cos=features.get('hour_cos'),
+            dow_sin=features.get('dow_sin'),
+            dow_cos=features.get('dow_cos'),
         )
 
     else:
@@ -285,7 +301,7 @@ def estimate_stop_times(
     for idx, stop in enumerate(stops_to_predict):
         next_stop = stops_to_predict[idx + 1] if idx + 1 < len(stops_to_predict) else None
 
-        distance_m, progress_on_segment, progress_ratio = _progress_features(
+        distance_m, distance_to_next, progress_ratio = _progress_features(
             vehicle_position,
             stop,
             next_stop,
@@ -299,21 +315,53 @@ def estimate_stop_times(
             or idx + 1
         )
 
-        # Build features
+        # Kinematic / status features straight off the live VehiclePosition.
+        bearing_to_stop = _initial_bearing(
+            vehicle_position['lat'], vehicle_position['lon'],
+            stop['lat'], stop['lon'],
+        )
+        vp_bearing = vehicle_position.get('bearing', vehicle_position.get('heading'))
+        vp_speed = vehicle_position.get('speed')  # m/s, matching the builder
+        # Fallbacks keep every trained feature non-null online: a None feature is
+        # skipped by predict_eta and the model then rejects the missing column.
+        current_speed_kmh = vp_speed * 3.6 if vp_speed is not None else 0.0
+        bearing_diff = _angle_diff(vp_bearing, bearing_to_stop)
+        if bearing_diff is None:
+            bearing_diff = 0.0
+        if distance_to_next is None:  # last stop in the window has no successor
+            distance_to_next = distance_m
+        is_at_stop = vehicle_position.get('current_status') == 'STOPPED_AT'
+
+        # Cyclical temporal encodings (must match the builder).
+        hour = temporal_features['hour']
+        dow = temporal_features['day_of_week']
+
+        # Build features. Shape-derived features need the route geometry, which is
+        # not available online; use geometric proxies so the served input matches
+        # the trained schema (distance_to_stop is haversine in the builder too).
         features = {
             'route_id': route_id,
             'stop_sequence': stop_sequence_value,
             'distance_to_stop': distance_m,
-            'progress_on_segment': progress_on_segment,
+            'distance_to_next_stop': distance_to_next,
+            'shape_distance_to_stop': distance_m,       # proxy: no shape online
+            'shape_progress': progress_ratio,           # proxy: no shape online
+            'cross_track_error': 0.0,                   # proxy: assume on-route
             'progress_ratio': progress_ratio,
-            'hour': temporal_features['hour'],
-            'day_of_week': temporal_features['day_of_week'],
+            'stops_ahead': idx + 1,
+            'current_speed_kmh': current_speed_kmh,
+            'bearing_to_stop': bearing_to_stop,
+            'bearing_diff': bearing_diff,
+            'is_at_stop': is_at_stop,
+            'hour': hour,
+            'day_of_week': dow,
             'is_weekend': temporal_features['is_weekend'],
             'is_holiday': temporal_features['is_holiday'],
             'is_peak_hour': temporal_features['is_peak_hour'],
-            'temperature_c': _config.default_temperature_c,
-            'precipitation_mm': _config.default_precipitation_mm,
-            'wind_speed_kmh': _config.default_wind_speed_kmh,
+            'hour_sin': math.sin(2 * math.pi * hour / 24.0),
+            'hour_cos': math.cos(2 * math.pi * hour / 24.0),
+            'dow_sin': math.sin(2 * math.pi * dow / 7.0),
+            'dow_cos': math.cos(2 * math.pi * dow / 7.0),
         }
 
         try:

@@ -15,33 +15,48 @@ from common.utils import format_seconds
 
 def predict_eta(model_key: str,
                 distance_to_stop: float,
-                progress_on_segment: Optional[float] = None,
+                distance_to_next_stop: Optional[float] = None,
+                shape_distance_to_stop: Optional[float] = None,
+                shape_progress: Optional[float] = None,
+                cross_track_error: Optional[float] = None,
                 progress_ratio: Optional[float] = None,
+                stops_ahead: Optional[int] = None,
+                current_speed_kmh: Optional[float] = None,
+                bearing_to_stop: Optional[float] = None,
+                bearing_diff: Optional[float] = None,
+                is_at_stop: Optional[bool] = None,
                 hour: Optional[int] = None,
                 day_of_week: Optional[int] = None,
                 is_peak_hour: Optional[bool] = None,
                 is_weekend: Optional[bool] = None,
                 is_holiday: Optional[bool] = None,
-                temperature_c: Optional[float] = None,
-                precipitation_mm: Optional[float] = None,
-                wind_speed_kmh: Optional[float] = None) -> Dict:
+                hour_sin: Optional[float] = None,
+                hour_cos: Optional[float] = None,
+                dow_sin: Optional[float] = None,
+                dow_cos: Optional[float] = None) -> Dict:
     """
     Predict ETA using polynomial regression time model.
-    
+
     Args:
         model_key: Model identifier
-        distance_to_stop: Distance in meters
-        progress_on_segment: 0-1 fraction along the current stop-to-stop segment
+        distance_to_stop: Haversine distance to target stop (meters)
+        distance_to_next_stop: Distance to the immediate next stop (meters)
+        shape_distance_to_stop: Along-shape distance to target stop (meters)
+        shape_progress: 0-1 fraction along the route shape
+        cross_track_error: Perpendicular distance off the shape (meters)
         progress_ratio: 0-1 fraction along the overall route
+        stops_ahead: Number of stops between the vehicle and the target
+        current_speed_kmh: Vehicle speed (km/h)
+        bearing_to_stop: Initial bearing from vehicle to target stop (degrees)
+        bearing_diff: |vehicle heading - bearing_to_stop| wrapped to 0-180
+        is_at_stop: Whether the vehicle currently reports STOPPED_AT
         hour: Hour of day (0-23)
         day_of_week: Day of week (0=Monday)
         is_peak_hour: Peak hour flag
         is_weekend: Weekend flag
         is_holiday: Holiday flag
-        temperature_c: Temperature
-        precipitation_mm: Precipitation
-        wind_speed_kmh: Wind speed
-        
+        hour_sin/hour_cos/dow_sin/dow_cos: Cyclical temporal encodings
+
     Returns:
         Dictionary with prediction and metadata
     """
@@ -49,24 +64,33 @@ def predict_eta(model_key: str,
     registry = get_registry()
     model = registry.load_model(model_key)
     metadata = registry.load_metadata(model_key)
-    
+
     # Prepare input
     input_data = {'distance_to_stop': [distance_to_stop]}
-    
+
     # Add optional features
     optional_features = {
-        'progress_on_segment': progress_on_segment,
+        'distance_to_next_stop': distance_to_next_stop,
+        'shape_distance_to_stop': shape_distance_to_stop,
+        'shape_progress': shape_progress,
+        'cross_track_error': cross_track_error,
         'progress_ratio': progress_ratio,
+        'stops_ahead': stops_ahead,
+        'current_speed_kmh': current_speed_kmh,
+        'bearing_to_stop': bearing_to_stop,
+        'bearing_diff': bearing_diff,
+        'is_at_stop': is_at_stop,
         'hour': hour,
         'day_of_week': day_of_week,
         'is_peak_hour': is_peak_hour,
         'is_weekend': is_weekend,
         'is_holiday': is_holiday,
-        'temperature_c': temperature_c,
-        'precipitation_mm': precipitation_mm,
-        'wind_speed_kmh': wind_speed_kmh
+        'hour_sin': hour_sin,
+        'hour_cos': hour_cos,
+        'dow_sin': dow_sin,
+        'dow_cos': dow_cos,
     }
-    
+
     for key, value in optional_features.items():
         if value is not None:
             input_data[key] = [value]

@@ -21,17 +21,24 @@ def test_sample_dataset_satisfies_feature_contract():
     ds = load_dataset("sample")
     # Target present
     assert TARGET in ds.df.columns
-    # The feature groups the models actually consume are fully present in the
-    # builder output — pins builder <-> ETADataset.FEATURE_GROUPS agreement.
-    for group in ("temporal", "position"):
+    # Every model-consumed feature group is fully present in the builder output —
+    # pins builder <-> ETADataset.FEATURE_GROUPS agreement.
+    for group in ("position", "spatial", "kinematic", "status", "temporal"):
         expected = set(ETADataset.FEATURE_GROUPS[group])
         present = set(ds.get_features([group]))
         assert expected == present, f"{group} contract drift: missing {expected - present}"
 
 
+def test_dropped_legacy_columns_absent():
+    # progress_on_segment + weather were removed from the builder.
+    ds = load_dataset("sample")
+    for col in ("progress_on_segment", "temperature_c", "precipitation_mm", "wind_speed_kmh"):
+        assert col not in ds.df.columns, f"legacy column {col} unexpectedly present"
+
+
 def test_prepare_features_target_shapes():
     ds = load_dataset("sample")
-    feats = ds.get_features(["temporal", "position"])
+    feats = ds.get_features(["temporal", "position", "spatial", "kinematic", "status"])
     X, y = prepare_features_target(ds.df, feats, target_col=TARGET)
     assert list(X.columns) == feats
     assert len(X) == len(y) == len(ds.df)

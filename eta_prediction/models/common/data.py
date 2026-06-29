@@ -16,20 +16,29 @@ class ETADataset:
     
     Expected columns from VP dataset builder:
     - Identifiers: trip_id, route_id, vehicle_id, stop_id, stop_sequence
-    - Position: vp_ts, vp_lat, vp_lon, vp_bearing
-    - Stop: stop_lat, stop_lon, distance_to_stop
-    - Target: actual_arrival, time_to_arrival_seconds
-    - Temporal: hour, day_of_week, is_weekend, is_holiday, is_peak_hour
-    - Operational: headway_seconds, current_speed_kmh
-    - Weather (optional): temperature_c, precipitation_mm, wind_speed_kmh
+    - Position: vp_lat, vp_lon, vp_bearing, distance_to_stop (+ stop_lat/lon, vp_ts)
+    - Spatial: distance_to_next_stop, shape_distance_to_stop, shape_progress,
+      cross_track_error, progress_ratio, stops_ahead
+    - Kinematic: current_speed_kmh, bearing_to_stop, bearing_diff
+    - Status: is_at_stop
+    - Temporal: hour, day_of_week, is_weekend, is_holiday, is_peak_hour,
+      hour_sin, hour_cos, dow_sin, dow_cos
+    - Target: actual_arrival, time_to_arrival_seconds (+ *_computed / *_stopped_at)
+
+    All non-target groups are *serveable* — every feature is computable online by
+    eta_service.estimator from a live VehiclePosition + scheduled stops, so the
+    trained models stay in sync with serving.
     """
-    
+
     FEATURE_GROUPS = {
         'identifiers': ['trip_id', 'route_id', 'vehicle_id', 'stop_id', 'stop_sequence'],
         'position': ['vp_lat', 'vp_lon', 'vp_bearing', 'distance_to_stop'],
-        'temporal': ['hour', 'day_of_week', 'is_weekend', 'is_holiday', 'is_peak_hour'],
-        'operational': ['headway_seconds', 'current_speed_kmh'],
-        'weather': ['temperature_c', 'precipitation_mm', 'wind_speed_kmh'],
+        'spatial': ['distance_to_next_stop', 'shape_distance_to_stop', 'shape_progress',
+                    'cross_track_error', 'progress_ratio', 'stops_ahead'],
+        'kinematic': ['current_speed_kmh', 'bearing_to_stop', 'bearing_diff'],
+        'status': ['is_at_stop'],
+        'temporal': ['hour', 'day_of_week', 'is_weekend', 'is_holiday', 'is_peak_hour',
+                     'hour_sin', 'hour_cos', 'dow_sin', 'dow_cos'],
         'target': ['time_to_arrival_seconds']
     }
     
@@ -174,7 +183,7 @@ class ETADataset:
             'stops': self.df['stop_id'].nunique(),
             'eta_mean_minutes': self.df['time_to_arrival_seconds'].mean() / 60,
             'eta_std_minutes': self.df['time_to_arrival_seconds'].std() / 60,
-            'missing_weather': self.df['temperature_c'].isna().sum() if 'temperature_c' in self.df.columns else 'N/A'
+            'at_stop_frac': float(self.df['is_at_stop'].mean()) if 'is_at_stop' in self.df.columns else 'N/A'
         }
 
 

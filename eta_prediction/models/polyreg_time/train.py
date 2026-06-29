@@ -1,6 +1,6 @@
 """
 Polynomial Regression Model - Time Enhanced
-Fits polynomial features with temporal, spatial, and optional weather features.
+Fits polynomial features with temporal, spatial, and kinematic features.
 """
 
 import pandas as pd
@@ -34,53 +34,55 @@ class PolyRegTimeModel:
     """
     Enhanced polynomial regression with temporal/spatial features.
     
-    Features: 
+    Features (all serveable online by eta_service.estimator):
     - Core: distance_to_stop (polynomialized)
-    - Temporal: hour, day_of_week, is_weekend, is_peak_hour
-    - Spatial: progress_on_segment, progress_ratio
-    - Weather: temperature_c, precipitation_mm, wind_speed_kmh
+    - Temporal: hour, day_of_week, is_weekend, is_peak_hour + cyclical sin/cos
+    - Spatial: distance_to_next_stop, shape_distance_to_stop, shape_progress,
+      cross_track_error, progress_ratio, stops_ahead
+    - Kinematic: current_speed_kmh, bearing_to_stop, bearing_diff
+    - Status: is_at_stop
     """
-    
+
     def __init__(self,
                  poly_degree: int = 2,
                  alpha: float = 1.0,
                  include_temporal: bool = True,
                  include_spatial: bool = True,
-                 include_weather: bool = False,
                  handle_nan: str = 'drop'):  # 'drop', 'impute', or 'error'
         """
         Initialize model.
-        
+
         Args:
             poly_degree: Polynomial degree for distance
             alpha: Ridge regularization strength
             include_temporal: Include time-of-day features
-            include_spatial: Include spatial progress/segment features
-            include_weather: Include weather features
+            include_spatial: Include spatial/kinematic/status features
             handle_nan: How to handle NaN - 'drop', 'impute', or 'error'
         """
         self.poly_degree = poly_degree
         self.alpha = alpha
         self.include_temporal = include_temporal
         self.include_spatial = include_spatial
-        self.include_weather = include_weather
         self.handle_nan = handle_nan
         self.model = None
         self.feature_cols = None
         self.available_features = None
         self.categorical_features: List[str] = []
         self.numeric_features: List[str] = []
-        
+
     def _get_feature_groups(self) -> Dict[str, List[str]]:
-        """Define feature groups."""
+        """Define feature groups (all computable online for serving parity)."""
         return {
             'core': ['distance_to_stop'],
-            'spatial_numeric': ['progress_on_segment', 'progress_ratio']
-                              if self.include_spatial else [],
-            'temporal': ['hour', 'day_of_week', 'is_weekend', 'is_peak_hour'] 
-                       if self.include_temporal else [],
-            'weather': ['temperature_c', 'precipitation_mm', 'wind_speed_kmh'] 
-                      if self.include_weather else []
+            'spatial_numeric': [
+                'distance_to_next_stop', 'shape_distance_to_stop', 'shape_progress',
+                'cross_track_error', 'progress_ratio', 'stops_ahead',
+                'current_speed_kmh', 'bearing_to_stop', 'bearing_diff', 'is_at_stop',
+            ] if self.include_spatial else [],
+            'temporal': [
+                'hour', 'day_of_week', 'is_weekend', 'is_peak_hour',
+                'hour_sin', 'hour_cos', 'dow_sin', 'dow_cos',
+            ] if self.include_temporal else [],
         }
     
     def _clean_data(self, df: pd.DataFrame, 
@@ -274,7 +276,6 @@ class PolyRegTimeModel:
             'core',
             'spatial_numeric',
             'temporal',
-            'weather',
         ]
         for group in group_order:
             for feat in feature_groups.get(group, []):
@@ -370,7 +371,6 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
                       alpha: float = 1.0,
                       include_temporal: bool = True,
                       include_spatial: bool = True,
-                      include_weather: bool = False,
                       handle_nan: str = 'drop',
                       test_size: float = 0.2,
                       save_model: bool = True,
@@ -384,7 +384,7 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         poly_degree: Polynomial degree for distance
         alpha: Ridge regularization
         include_temporal: Include temporal features
-        include_weather: Include weather features
+        include_spatial: Include spatial/kinematic/status features
         handle_nan: 'drop', 'impute', or 'error'
         test_size: Test set fraction
         save_model: Save to registry
@@ -402,7 +402,7 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
     print(f"Config:")
     print(f"  poly_degree={poly_degree}, alpha={alpha}")
     print(f"  temporal={include_temporal}, spatial={include_spatial}")
-    print(f"  weather={include_weather}, handle_nan='{handle_nan}'")
+    print(f"  handle_nan='{handle_nan}'")
     
     # Load dataset
     print(f"\nLoading dataset: {dataset_name}")
@@ -439,7 +439,6 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         alpha=alpha,
         include_temporal=include_temporal,
         include_spatial=include_spatial,
-        include_weather=include_weather,
         handle_nan=handle_nan
     )
     model.fit(train_df)
@@ -478,7 +477,6 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
         'alpha': alpha,
         'include_temporal': include_temporal,
         'include_spatial': include_spatial,
-        'include_weather': include_weather,
         'handle_nan': handle_nan,
         'n_features': len(model.feature_cols) if model.feature_cols else 0,
         'features': model.feature_cols,
@@ -496,8 +494,6 @@ def train_polyreg_time(dataset_name: str = "sample_dataset",
             feature_groups.append('temporal')
         if include_spatial:
             feature_groups.append('spatial')
-        if include_weather:
-            feature_groups.append('weather')
         model_key = ModelKey.generate(
             model_type='polyreg_time',
             dataset_name=dataset_name,
@@ -526,14 +522,12 @@ if __name__ == "__main__":
     result1 = train_polyreg_time(
         poly_degree=2,
         include_temporal=True,
-        include_weather=False,
         handle_nan='drop'
     )
-    
+
     # With imputation
     result2 = train_polyreg_time(
         poly_degree=2,
         include_temporal=True,
-        include_weather=False,
         handle_nan='impute'
     )
