@@ -71,17 +71,26 @@ HTTP_READ_TIMEOUT = env.float("HTTP_READ_TIMEOUT", default=5.0)
 S3_VP_SINK_ENABLED = env.bool("S3_VP_SINK_ENABLED", default=False)
 S3_VP_BASE_URI = env("S3_VP_BASE_URI", default="")
 
-from celery.schedules import schedule
+# --- Local spool (poll -> spool -> hourly S3 flush) ---
+# Polls append here (~200ms local DuckDB insert) instead of writing to S3
+# directly. DuckDB is single-writer, so the poll queue must run at
+# --concurrency=1. See rt_pipeline/storage/spool.py.
+SPOOL_PATH = env("SPOOL_PATH", default="/data/spool/vp_spool.duckdb")
 
-# CELERY_BEAT_SCHEDULE = {
-#     # existing vehicle positions schedule
-#     "poll-vehicle-positions": {
-#         "task": "rt_pipeline.tasks.fetch_vehicle_positions",
-#         "schedule": schedule(run_every=POLL_SECONDS),
-#     },
-#     # NEW — trip updates
-#     "poll-trip-updates": {
-#         "task": "rt_pipeline.tasks.fetch_trip_updates",
-#         "schedule": schedule(run_every=POLL_SECONDS),
-#     },
-# }
+# --- Observability status files (atomic, cat/tail-able) ---
+# See rt_pipeline/status.py.
+STATUS_DIR = env("STATUS_DIR", default="/var/lib/simovi/status")
+
+# --- Hourly spool -> S3 staging flush ---
+# One Parquet object per (year, month, day) -- no route_id fan-out. Daily
+# compaction re-partitions staging into the curated route_id-partitioned
+# layout at S3_VP_BASE_URI.
+S3_VP_STAGING_BASE_URI = env(
+    "S3_VP_STAGING_BASE_URI",
+    default="s3://transit/feeds/mbta/vehicle_positions_staging",
+)
+SPOOL_FLUSH_MINUTE = env.int("SPOOL_FLUSH_MINUTE", default=2)
+
+# --- Daily staging -> curated compaction ---
+COMPACT_HOUR_UTC = env.int("COMPACT_HOUR_UTC", default=3)
+COMPACT_MINUTE = env.int("COMPACT_MINUTE", default=15)

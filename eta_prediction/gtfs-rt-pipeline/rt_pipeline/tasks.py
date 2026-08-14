@@ -1,14 +1,53 @@
-from celery import shared_task
-from django.conf import settings
-import requests
-from google.transit import gtfs_realtime_pb2
-from datetime import datetime, timezone
-from django.db import transaction, IntegrityError
-from .models import RawMessage, VehiclePosition, TripUpdate
+"""Celery tasks for the MBTA GTFS-RT collector.
+
+VehiclePositions polling writes to a local DuckDB spool
+(``rt_pipeline.storage.spool.Spool``) rather than S3 directly -- S3 is only
+touched by the hourly ``flush_vp_spool_s3`` task. This decouples "durably
+record a poll" from "touch S3", which fixes the incident where a per-poll
+``COPY ... PARTITION_BY (..., route_id)`` fanned out into ~160 S3 PUTs (one
+per active MBTA route) every 5 seconds -- see ``docs/S3_LAYOUT.md`` and the
+project plan for the full writeup.
+"""
+
+from __future__ import annotations
+
 import hashlib
 import logging
+from datetime import datetime, timezone
+from typing import Any
+
+import pandas as pd
+from celery import shared_task
+from django.conf import settings
+from django.db import IntegrityError, transaction
+import requests
+from google.transit import gtfs_realtime_pb2
+
+from . import status
+from .models import RawMessage, TripUpdate, VehiclePosition
+from .storage.spool import Spool
 
 logger = logging.getLogger(__name__)
+
+# One Spool instance per worker process. The poll queue runs at
+# --concurrency=1 (DuckDB is single-writer), so this is never shared across
+# concurrent writers; each Spool method still opens/closes its own
+# connection (see spool.py) so no lock is held across a task boundary.
+_spool: Spool | None = None
+
+
+def _get_spool() -> Spool:
+    global _spool
+    if _spool is None:
+        _spool = Spool(getattr(settings, "SPOOL_PATH", None))
+    return _spool
+
+
+_STATUS_NAME = "mbta"
+
+
+def _status_dir() -> str | None:
+    return getattr(settings, "STATUS_DIR", None)
 
 def _sha256_hex(b: bytes) -> str: return hashlib.sha256(b).hexdigest()
 def _to_ts(sec): return datetime.fromtimestamp(sec, tz=timezone.utc) if sec else None
@@ -65,27 +104,68 @@ def _vp_entity_to_record(ent, ingested):
     }
 
 
-# Vehicle Positions -> S3 only (no Postgres). This is the active scheduled task.
+# Vehicle Positions -> local spool only (no Postgres, no S3). This is the
+# active scheduled task.
 @shared_task(bind=True, queue="fetch",
              autoretry_for=(requests.RequestException,), retry_backoff=True,
              retry_kwargs={"max_retries": 5})
 def poll_vehicle_positions_s3(self):
-    """Fetch the VehiclePositions feed and write it straight to S3 Hive-Parquet.
+    """Fetch the VehiclePositions feed and append it to the local DuckDB spool.
 
-    Does NOT touch Postgres (no RawMessage, no VehiclePosition rows). This is
-    the only task scheduled by beat; the legacy Postgres fetch/parse tasks
-    below are kept for reference but are not scheduled.
+    Does NOT touch Postgres (no RawMessage, no VehiclePosition rows) and does
+    NOT touch S3 -- that used to happen here directly via a per-poll
+    ``COPY ... PARTITION_BY (..., route_id)``, which fanned out into ~160 S3
+    PUTs per poll (one per active MBTA route) and drove poll latency past
+    300s against a 5s beat schedule. S3 is now only written by the hourly
+    ``flush_vp_spool_s3`` task. This remains the only task scheduled by beat
+    for MBTA VP polling; the legacy Postgres fetch/parse tasks below are kept
+    for reference but are not scheduled.
     """
-    url = settings.GTFSRT_VEHICLE_POSITIONS_URL
-    r = requests.get(url, timeout=(settings.HTTP_CONNECT_TIMEOUT, settings.HTTP_READ_TIMEOUT))
-    r.raise_for_status()
-    if not r.content:
-        return {"skipped": True}
-    feed = gtfs_realtime_pb2.FeedMessage()
-    feed.ParseFromString(r.content)
-    ingested = _now()
-    records = [_vp_entity_to_record(ent, ingested) for ent in feed.entity if ent.HasField("vehicle")]
-    return {"s3_rows": _write_vp_records_to_s3(records)}
+    fetch_ok = False
+    try:
+        url = settings.GTFSRT_VEHICLE_POSITIONS_URL
+        r = requests.get(
+            url, timeout=(settings.HTTP_CONNECT_TIMEOUT, settings.HTTP_READ_TIMEOUT)
+        )
+        r.raise_for_status()
+        fetch_ok = True
+        ingested = _now()
+
+        if not r.content:
+            status.update(
+                _STATUS_NAME, _status_dir(),
+                last_poll_utc=ingested.isoformat(),
+                fetch_ok=True, fetch_fail=False,
+                rows_fetched=0, rows_new=0,
+            )
+            return {"skipped": True}
+
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.ParseFromString(r.content)
+        records = [
+            _vp_entity_to_record(ent, ingested)
+            for ent in feed.entity if ent.HasField("vehicle")
+        ]
+        df = pd.DataFrame.from_records(records) if records else pd.DataFrame()
+        sp = _get_spool()
+        spooled = sp.append(df)
+        spool_stats = sp.stats()
+
+        status.update(
+            _STATUS_NAME, _status_dir(),
+            last_poll_utc=ingested.isoformat(),
+            fetch_ok=True, fetch_fail=False,
+            rows_fetched=len(records), rows_new=spooled,
+            spool_rows=spool_stats["rows"], spool_bytes=spool_stats["bytes"],
+        )
+        return {"fetched": len(records), "spooled": spooled}
+    except Exception as exc:
+        status.update(
+            _STATUS_NAME, _status_dir(), event=True,
+            fetch_ok=fetch_ok, fetch_fail=not fetch_ok,
+            last_error=str(exc), last_error_utc=_now().isoformat(),
+        )
+        raise
 
 # Vehicle Positions tasks
 @shared_task(bind=True, autoretry_for=(requests.RequestException,), retry_backoff=True, retry_kwargs={"max_retries": 5})
@@ -288,16 +368,118 @@ def parse_and_upsert_trip_updates(self, raw_id: str):
         TripUpdate.objects.bulk_create(rows, ignore_conflicts=True)
     return {"parsed_rows": len(rows)}
 
+
+# ---- Spool -> S3 staging flush ----
+
+@shared_task(bind=True, queue="maint")
+def flush_vp_spool_s3(self) -> dict[str, Any]:
+    """Hourly: drain spooled rows older than the current UTC hour to S3 staging.
+
+    The write-then-verify-then-delete logic (and the reason ``route_id`` is
+    NOT part of the partitioning here) lives in
+    ``rt_pipeline.storage.spool.flush_to_staging``, which is Django-free and
+    unit-tested directly against a local temp directory. This task is a thin
+    wrapper: compute the UTC-hour cutoff, call it, and report status.
+    """
+    from .storage.spool import flush_to_staging
+
+    now = _now()
+    cutoff = now.replace(minute=0, second=0, microsecond=0)
+    sp = _get_spool()
+    base_uri = settings.S3_VP_STAGING_BASE_URI
+
+    try:
+        result = flush_to_staging(sp, base_uri, cutoff)
+    except Exception as exc:
+        logger.exception("flush_vp_spool_s3: write/verify failed; spool left intact")
+        status.update(
+            _STATUS_NAME, _status_dir(), event=True,
+            last_error=str(exc), last_error_utc=_now().isoformat(),
+        )
+        return {"flushed": 0, "error": str(exc)}
+
+    spool_stats = sp.stats()
+    status.update(
+        _STATUS_NAME, _status_dir(), event=True,
+        last_flush_utc=now.isoformat(),
+        last_flush_key=",".join(result["days"]),
+        last_flush_rows=result["flushed"],
+        spool_rows=spool_stats["rows"], spool_bytes=spool_stats["bytes"],
+    )
+    return result
+
+
+# ---- Daily curated compaction ----
+
+@shared_task(bind=True, queue="maint")
+def compact_vp_day(self) -> dict[str, Any]:
+    """Daily: compact closed-day staging objects into the curated dataset.
+
+    Delegates to ``rt_pipeline.compaction`` (a separate work item owned by
+    another agent). Imported lazily inside the task body so beat/worker
+    startup never fails if that module isn't present yet or is mid-change --
+    a missing compaction module should degrade to "compaction skipped today",
+    never "worker won't boot".
+    """
+    try:
+        # rt_pipeline.compaction.run_compaction(feeds=None, dry_run=False,
+        # since=None, until=None, ...) -> dict. Signature confirmed against
+        # rt_pipeline/compaction/__init__.py, which documents this task as
+        # its intended caller. Imported lazily anyway so a future change to
+        # that module can never prevent beat/worker startup.
+        from rt_pipeline.compaction import run_compaction
+    except ImportError as exc:
+        logger.error("compact_vp_day: rt_pipeline.compaction unavailable: %s", exc)
+        return {"error": "compaction module unavailable"}
+
+    try:
+        result = run_compaction(feeds=None, dry_run=False)
+    except Exception as exc:
+        logger.exception("compact_vp_day: compaction run failed")
+        status.update(
+            _STATUS_NAME, _status_dir(), event=True,
+            last_error=f"compaction failed: {exc}",
+            last_error_utc=_now().isoformat(),
+        )
+        return {"error": "compaction run failed"}
+
+    status.update(
+        _STATUS_NAME, _status_dir(), event=True,
+        last_compaction_utc=_now().isoformat(),
+        last_compaction_day=result.get("today_utc"),
+        last_compaction_files=result.get("compacted"),
+        last_compaction_rows_in=result.get("rows_in"),
+        last_compaction_rows_out=result.get("rows_out"),
+        last_compaction_dupes_removed=result.get("dupes_removed"),
+        last_compaction_errors=result.get("errors"),
+    )
+    return result
+
+
 # ---- Celery Beat schedule ----
-from celery.schedules import schedule
+from celery.schedules import crontab, schedule
 from ingestproj.celery import app as celery_app
 
-# Only VehiclePositions -> S3 is scheduled. The Postgres VP fetch/parse and the
-# TripUpdate tasks above remain defined but are intentionally NOT scheduled
-# (we only want VPs as Parquet in S3 right now). Re-add entries here to revive.
+# VehiclePositions polling, the hourly spool->staging flush, and the daily
+# staging->curated compaction are the only scheduled tasks. The Postgres VP
+# fetch/parse and the TripUpdate tasks above remain defined but are
+# intentionally NOT scheduled. Re-add entries here to revive.
 celery_app.conf.beat_schedule = {
     "poll-vehicle-positions-s3": {
         "task": "rt_pipeline.tasks.poll_vehicle_positions_s3",
         "schedule": schedule(run_every=settings.POLL_SECONDS),
+        # The single most important line in this schedule: a poll that
+        # missed its slot is DROPPED rather than queued, so a backlog can
+        # never accumulate again (this is what let the queue grow without
+        # bound during the OOM incident).
+        "options": {"expires": settings.POLL_SECONDS},
+    },
+    "flush-vp-spool": {
+        "task": "rt_pipeline.tasks.flush_vp_spool_s3",
+        "schedule": crontab(minute=settings.SPOOL_FLUSH_MINUTE),
+    },
+    "compact-vp-day": {
+        "task": "rt_pipeline.tasks.compact_vp_day",
+        "schedule": crontab(hour=settings.COMPACT_HOUR_UTC, minute=settings.COMPACT_MINUTE),
     },
 }

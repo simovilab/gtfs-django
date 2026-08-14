@@ -28,6 +28,13 @@ RUN apt-get update \
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir uv
 
+# MinIO client — rt_pipeline.compaction.storage.McStorage shells out to `mc`
+# for the list/move/remove operations DuckDB cannot do itself. Without it the
+# daily compaction task dies with FileNotFoundError.
+RUN curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc \
+        -o /usr/local/bin/mc \
+    && chmod +x /usr/local/bin/mc
+
 # --- gtfs-django package (target of the editable path dep `gtfs-django @ ../..`) ---
 WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./

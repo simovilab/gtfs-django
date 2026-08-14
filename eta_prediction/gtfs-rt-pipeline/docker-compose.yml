@@ -53,6 +53,8 @@ services:
       "
     restart: unless-stopped
 
+  # Poll + hourly spool flush. MUST stay at --concurrency=1: DuckDB permits a
+  # single read-write process per database file, and both tasks write the spool.
   celery-worker:
     build:
       context: ../..
@@ -63,6 +65,8 @@ services:
       - .:/app/eta_prediction/gtfs-rt-pipeline
       - ../feature_engineering:/app/eta_prediction/feature_engineering
       - ../datasets:/app/eta_prediction/datasets
+      - vp_spool:/data/spool
+      - /var/lib/simovi/status:/var/lib/simovi/status
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,9 +74,40 @@ services:
         condition: service_healthy
     command: >
       bash -c "
-        celery -A ingestproj worker -Q fetch,upsert -l INFO
+        celery -A ingestproj worker -Q fetch,upsert -l INFO --concurrency=1
       "
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # Daily compaction only. Touches S3, never the spool, so it is safe on its
+  # own process — and it runs for minutes, which must not stall polling.
+  celery-maint:
+    build:
+      context: ../..
+      dockerfile: eta_prediction/gtfs-rt-pipeline/Dockerfile
+    env_file: .env
+    working_dir: /app/eta_prediction/gtfs-rt-pipeline
+    volumes:
+      - .:/app/eta_prediction/gtfs-rt-pipeline
+      - ../feature_engineering:/app/eta_prediction/feature_engineering
+      - /var/lib/simovi/status:/var/lib/simovi/status
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      bash -c "
+        celery -A ingestproj worker -Q maint -l INFO --concurrency=1
+      "
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   celery-beat:
     build:
@@ -91,6 +126,14 @@ services:
         celery -A ingestproj beat -l INFO
       "
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
 volumes:
   postgres_data:
+  # Durable spool. A container recreate must not lose the current hour of
+  # fixes — that is the whole reason the spool is on disk rather than in memory.
+  vp_spool:
