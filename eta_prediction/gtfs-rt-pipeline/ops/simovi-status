@@ -187,6 +187,16 @@ def feed_panel(title: str, name: str, now: datetime, *, cadence: str,
     else:
         row("last flush", dim("none yet"), "first flush lands on the next boundary")
 
+    # Weekly, so "stale" means days not minutes -- a run every Monday leaves
+    # up to ~8 days between snapshots even when nothing is wrong.
+    ls = parse_ts(st.get("last_static_snapshot_utc"))
+    if ls:
+        stale = (now - ls).total_seconds() > 8 * 86400
+        row("static gtfs", red(ago(ls, now)) if stale else ago(ls, now),
+            human_bytes(st.get("last_static_snapshot_bytes")))
+    else:
+        row("static gtfs", dim("none yet"), "first snapshot lands the next Monday 04:00 UTC")
+
     for lbl, val, ext in (extra_lines or []):
         row(lbl, val, ext)
 

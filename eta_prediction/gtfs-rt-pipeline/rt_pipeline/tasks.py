@@ -472,9 +472,15 @@ def compact_vp_day(self) -> dict[str, Any]:
 
 # ---- Weekly static GTFS snapshots (roadmap 0.2) ----
 
+# agency -> (status name, url getter). The status name is NOT always the
+# agency: the live bUCR collector and `simovi-status` both key its status
+# files on "navsat" (the collector's package name), not "bucr" -- writing
+# under "bucr" here would silently create a status file nothing ever reads,
+# the same class of bug as the queue-routing incident this project already
+# had. The S3 key prefix stays "bucr" to match the existing storage layout.
 _STATIC_GTFS_SOURCES = {
-    "mbta": lambda: settings.MBTA_GTFS_STATIC_URL,
-    "bucr": lambda: settings.BUCR_GTFS_STATIC_URL,
+    "mbta": ("mbta", lambda: settings.MBTA_GTFS_STATIC_URL),
+    "bucr": ("navsat", lambda: settings.BUCR_GTFS_STATIC_URL),
 }
 
 
@@ -494,7 +500,7 @@ def snapshot_static_gtfs(self) -> dict[str, Any]:
 
     today = _now().date()
     results: dict[str, Any] = {}
-    for agency, url_getter in _STATIC_GTFS_SOURCES.items():
+    for agency, (status_name, url_getter) in _STATIC_GTFS_SOURCES.items():
         url = url_getter()
         try:
             content = fetch(url)
@@ -502,7 +508,7 @@ def snapshot_static_gtfs(self) -> dict[str, Any]:
         except (StaticGtfsError, requests.RequestException) as exc:
             logger.exception("snapshot_static_gtfs: %s failed", agency)
             status.update(
-                agency, _status_dir(), event=True,
+                status_name, _status_dir(), event=True,
                 last_error=f"static GTFS snapshot failed: {exc}",
                 last_error_utc=_now().isoformat(),
             )
@@ -510,7 +516,7 @@ def snapshot_static_gtfs(self) -> dict[str, Any]:
             continue
 
         status.update(
-            agency, _status_dir(), event=True,
+            status_name, _status_dir(), event=True,
             last_static_snapshot_utc=_now().isoformat(),
             last_static_snapshot_key=key,
             last_static_snapshot_bytes=len(content),
