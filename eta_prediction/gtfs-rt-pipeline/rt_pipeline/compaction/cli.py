@@ -47,6 +47,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--dry-run", action="store_true", help="show the plan, change nothing")
     p.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "re-process legacy in-place leaves even if already compacted "
+            "(roadmap 0.4b: backfill dedup onto a pre-dedup compaction). "
+            "Never needed for routine runs"
+        ),
+    )
+    p.add_argument(
         "--since", type=_parse_date, default=None, help="ISO date, inclusive lower bound"
     )
     p.add_argument(
@@ -66,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         bucket=args.bucket,
         endpoint=args.endpoint,
         workers=args.workers,
+        force=args.force,
     )
 
     mode = "DRY-RUN" if summary["dry_run"] else "LIVE"

@@ -80,12 +80,19 @@ def run_compaction(
     bucket: str = "transit",
     endpoint: str | None = None,
     workers: int = 12,
+    force: bool = False,
 ) -> dict:
     """Run one compaction pass. Returns a JSON-serializable summary dict.
 
     `feeds` (list of `Feed.name`, default: all), `dry_run`, `since`/`until`
     (inclusive UTC date bounds, default: unbounded up to but excluding
     today) match the signature the `compact_vp_day` Celery task calls.
+
+    `force=True` re-processes legacy in-place leaves even if they already
+    hold a compacted `<date>.parquet` (roadmap 0.4b: backfilling dedup onto
+    days a pre-dedup compaction already merged). Leave it False for routine
+    runs -- staging->curated days are always safely re-processable and never
+    consult this flag.
 
     `store`/`duck` are the test injection points: pass a `LocalStorage` plus
     `DuckDB.connect_local()` to run entirely against a temp directory.
@@ -142,6 +149,7 @@ def run_compaction(
                     store,
                     duck.clone() if not dry_run else duck,
                     dry_run,
+                    force,
                 ): unit
                 for kind, unit in units
             }
@@ -158,8 +166,13 @@ def run_compaction(
 
 
 def _run_unit(
-    kind: str, unit: Leaf | StagingDay, store: Storage, duck: DuckDB, dry_run: bool
+    kind: str,
+    unit: Leaf | StagingDay,
+    store: Storage,
+    duck: DuckDB,
+    dry_run: bool,
+    force: bool = False,
 ) -> Result:
     if kind == "leaf":
-        return process_leaf(unit, store, duck, dry_run)  # type: ignore[arg-type]
+        return process_leaf(unit, store, duck, dry_run, force=force)  # type: ignore[arg-type]
     return process_staging_day(unit, store, duck, dry_run)  # type: ignore[arg-type]

@@ -103,13 +103,23 @@ def recover_staging(store: Storage, stats: Stats, dry_run: bool) -> None:
             stats.details.append(f"CLEANUP  stale stage for {leaf}")
 
 
-def process_leaf(leaf: Leaf, store: Storage, duck: DuckDB, dry_run: bool) -> Result:
-    """Compact one legacy in-place leaf: merge + dedup its files into one."""
+def process_leaf(
+    leaf: Leaf, store: Storage, duck: DuckDB, dry_run: bool, force: bool = False
+) -> Result:
+    """Compact one legacy in-place leaf: merge + dedup its files into one.
+
+    `force=True` bypasses the already-compacted guard below and re-reads the
+    existing ``<date>.parquet`` as its own source -- for backfilling dedup
+    onto leaves a pre-dedup compaction already merged into one file (roadmap
+    0.4b). Never used by the routine daily pass; only an explicit `--force`
+    backfill run sets it.
+    """
     # A finished leaf holds only the compacted <date>.parquet (sources are
     # deleted before it is published), so its presence is a sufficient, cheap
-    # "already compacted" guard for a closed day.
+    # "already compacted" guard for a closed day -- unless `force` asks to
+    # redo it anyway.
     name = output_name(leaf.date)
-    if store.exists(f"{leaf.key}/{name}"):
+    if not force and store.exists(f"{leaf.key}/{name}"):
         return Result("skipped", leaf.key)
 
     if dry_run:
