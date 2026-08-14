@@ -36,10 +36,17 @@ logger = logging.getLogger(__name__)
 _spool: Spool | None = None
 
 
-def _get_spool() -> Spool:
+def _get_spool(*, must_exist: bool = False) -> Spool:
+    """Process-wide spool handle.
+
+    ``must_exist=True`` is used by the flush path: an absent database file
+    there means the task is running on a worker that does not mount the spool
+    volume, where DuckDB would silently create an empty one and the flush
+    would report success having written nothing.
+    """
     global _spool
     if _spool is None:
-        _spool = Spool(getattr(settings, "SPOOL_PATH", None))
+        _spool = Spool(getattr(settings, "SPOOL_PATH", None), must_exist=must_exist)
     return _spool
 
 
@@ -371,7 +378,14 @@ def parse_and_upsert_trip_updates(self, raw_id: str):
 
 # ---- Spool -> S3 staging flush ----
 
-@shared_task(bind=True, queue="maint")
+# queue="fetch" is load-bearing and must match the routing note in
+# ingestproj/celery.py. A `queue=` on the decorator OVERRIDES task_routes, so
+# setting the route there alone is not enough. Two reasons this must be the
+# poll worker: DuckDB permits one read-write process per file, and only the
+# poll worker mounts the spool volume — on the maint worker this task opened a
+# brand-new empty database inside that container and reported a cheerful
+# {'flushed': 0, 'days': []} while the real spool grew unbounded.
+@shared_task(bind=True, queue="fetch")
 def flush_vp_spool_s3(self) -> dict[str, Any]:
     """Hourly: drain spooled rows older than the current UTC hour to S3 staging.
 
@@ -385,7 +399,7 @@ def flush_vp_spool_s3(self) -> dict[str, Any]:
 
     now = _now()
     cutoff = now.replace(minute=0, second=0, microsecond=0)
-    sp = _get_spool()
+    sp = _get_spool(must_exist=True)
     base_uri = settings.S3_VP_STAGING_BASE_URI
 
     try:

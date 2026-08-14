@@ -107,8 +107,20 @@ class Spool:
     S3.
     """
 
-    def __init__(self, path: Optional[str] = None) -> None:
+    def __init__(self, path: Optional[str] = None, *, must_exist: bool = False) -> None:
         self.path = path or DEFAULT_SPOOL_PATH
+        if must_exist and not Path(self.path).exists():
+            # Guards against opening a spool in the wrong process. The flush
+            # ran on a worker with no spool volume mounted once: DuckDB happily
+            # created an empty database there and the task reported a healthy
+            # {'flushed': 0} while the real spool grew without bound. An absent
+            # file at flush time is always a misconfiguration -- the poll task
+            # creates it long before the first flush -- so fail loudly.
+            raise FileNotFoundError(
+                f"spool database missing at {self.path!r}. The flush must run on "
+                "the worker that mounts the spool volume (queue 'fetch'); "
+                "opening it elsewhere silently creates an empty database."
+            )
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
