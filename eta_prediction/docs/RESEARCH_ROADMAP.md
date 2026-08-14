@@ -7,6 +7,10 @@
 > spool → hourly staging → daily compaction architecture and running on the Hetzner
 > VPS. See *Collector rebuild* below. 0.2 (static GTFS) and 0.5 (TripUpdates) remain
 > open; 0.2 is still the only item losing unrecoverable data.
+>
+> Adds *Collection strategy*: a 90-day replication window (**2026-08-14 → 2026-11-12**)
+> collected in the background while the whole study is rehearsed end-to-end on the
+> existing 28 days. Every phase below runs twice.
 
 ## Context
 
@@ -198,6 +202,57 @@ data-poor regime the paper is about.
 
 ---
 
+## Collection strategy — rehearse on 28 days, replicate on 90
+
+**Decided 2026-08-14.** The 90-day collection window runs **2026-08-14 → 2026-11-12**.
+Rather than wait for it, the existing 28 July days become a **rehearsal corpus**: every
+phase below — dataset build, splits, models, evaluation, figures, and a complete paper
+draft — is executed end-to-end against those 28 days first. When the 90 days land, the
+entire study is re-run against them.
+
+Why this is the right shape:
+
+- **The critical path stops being data collection.** Everything except the final numbers
+  can be finished while the collector runs. On 2026-11-12 the remaining work is a re-run,
+  not a research project.
+- **Every pipeline defect surfaces on cheap data.** A split-leakage bug or a broken
+  ablation arm found in September costs a re-run; found in November it costs the schedule.
+- **The final run becomes a reproducibility artifact.** Executing the identical pipeline
+  over a second, larger, independently collected window is exactly the robustness check
+  reviewers ask for — obtained for free as a by-product of the plan.
+
+**What does *not* transfer from rehearsal to replication.** The two corpora are not the
+same kind of data, and treating rehearsal numbers as preliminary results would be wrong:
+
+| | Rehearsal (28 days, 2026-07) | Replication (90 days, 08-14 →) |
+|---|---|---|
+| effective cadence | ~80 s between fixes | 5 s |
+| duplication | 1.85× until 0.4b runs | deduplicated at write |
+| rows/day | ~563 k | ~3–4 M unique |
+| static GTFS | no dated snapshot | snapshotted from 0.2 onward |
+
+So the rehearsal validates **pipeline correctness, experimental design, and code paths**.
+It does *not* produce transferable accuracy numbers, and anything sensitive to fix density
+— above all the segment-based reformulation in Phase 3, where traversal times come from
+consecutive fixes — will behave differently on the real corpus. Report only replication
+numbers; use the rehearsal to fix the *method*.
+
+**Consequences for the phases below:**
+
+- **0.2 (static GTFS) becomes urgent, not merely open.** The replication window is being
+  collected right now; every week without dated snapshots makes part of it irreproducible.
+- **0.4b (re-compact the 28 days with dedup) is promoted.** The rehearsal should mirror
+  replication conditions as closely as it can, and 1.85× duplication in the rehearsal
+  corpus would exercise the splits and the models under conditions that will never recur.
+- **Phase 6.1 freezes *two* test periods**, one per corpus, using identical selection
+  logic.
+- Down-sampling the replication corpus to ~80 s is worth running as a **deliberate
+  ablation arm** rather than a correction — it directly measures what fix density buys,
+  which is a paper-worthy result in its own right and turns the July/August cadence
+  discontinuity from a liability into a finding.
+
+---
+
 ## Research thesis
 
 > **Transit ETA prediction under data-quality asymmetry.** Learned models trained on a
@@ -238,11 +293,11 @@ data.**
 | # | Task | Size | Status |
 |---|---|---|---|
 | 0.1 | Restart the MBTA collector; add liveness monitoring | S | **Done 08-14.** Rebuilt rather than restarted — the original design was the cause of death. 5 s poll, `expires` so a backlog can never re-accumulate, `simovi-status` + status files for liveness |
-| 0.2 | Weekly static-GTFS snapshot task → `feeds/<agency>/gtfs_static/<ISO date>.zip`, for both agencies | S | **Open — do this first.** Every week without it is a week of dataset rebuilds that cannot be reproduced |
+| 0.2 | Weekly static-GTFS snapshot task → `feeds/<agency>/gtfs_static/<ISO date>.zip`, for both agencies | S | **Urgent.** The 90-day replication window is being collected now; every week without dated snapshots makes part of it irreproducible |
 | 0.3 | Fix the bUCR writer: batch to hourly objects instead of one row per file | M | **Done 08-14.** Durable DuckDB spool, hour-boundary flush, staging prefix. Window widened to 06:00–23:00 CR |
 | 0.3b | Re-partition bUCR by *event* date (`cr_datetime`), not ingestion date | M | **Open, deliberately deferred.** Stale device fixes (the 07-01 file holds `cr_datetime` back to 06-05) mean event-date partitioning has to merge into arbitrary past days. A `cr_datetime_utc` column was added instead, so this can be resolved in the builder rather than the collector |
 | 0.4 | Backfill-compact existing bUCR objects | S | **Done** — 44 days compacted, 1/day |
-| 0.4b | Re-compact the 28 existing MBTA days **with dedup** | S | **Open, needs a decision.** 15.7 M → ~8.5 M rows. Rewrites the corpus the current models trained on |
+| 0.4b | Re-compact the 28 existing MBTA days **with dedup** | S | **Promoted** — the 28 days are now the rehearsal corpus, and 1.85× duplication would exercise splits and models under conditions that never recur. 15.7 M → ~8.5 M rows |
 | 0.5 | Schedule `poll_trip_updates_s3` → `feeds/<agency>/trip_updates/`, mirroring the VP storage layer. Not urgent for the head-to-head, which `etaval` does live — this exists so the ablation grid (6.2) can replay one fixed window | M | Open |
 
 **Verification (0.1/0.3/0.4, confirmed on the VPS 2026-08-14):** MBTA poll age 0.3 s and
@@ -370,6 +425,9 @@ Phase 0 ──┬─→ Phase 1 ──┬─→ Phase 2 ──┐
 - Phase 1 blocks everything downstream.
 - Phases 2 and 4 are independent of each other and can interleave.
 - Phase 3 needs Phase 2 (bUCR data) only for the cross-agency arm; the MBTA arm can start as soon as Phase 1 lands.
+- Every phase runs twice: once against the 28-day rehearsal corpus, then again against the
+  90-day replication corpus once collection closes on **2026-11-12**. The second pass is a
+  re-run, not new work — see *Collection strategy* above.
 - Cut points, in order of least damage: 5.2 (LSTM), 6.3 (figure polish), 2.4/4.5 (secondary analyses).
 
 ## Open questions

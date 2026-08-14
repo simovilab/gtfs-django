@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+"""One-screen health check for the SIMOVI collectors.
+
+Answers, in order of how often you actually need it:
+  1. Is data still arriving?          (poll age)
+  2. Is it reaching S3?               (spool size + last flush)
+  3. Will it keep working?            (inode / disk runway on the MinIO box)
+
+Reads the status snapshots the collectors write to /var/lib/simovi/status and
+queries MinIO + the local host. Never raises: a section that cannot be read
+prints as unavailable rather than taking the whole report down with it.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+
+STATUS_DIR = os.environ.get("SIMOVI_STATUS_DIR", "/var/lib/simovi/status")
+ALIAS = os.environ.get("SIMOVI_MC_ALIAS", "simovilab")
+BUCKET = os.environ.get("SIMOVI_BUCKET", "transit")
+
+TTY = sys.stdout.isatty()
+
+
+def c(text: str, code: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if TTY else text
+
+
+def dim(t):  return c(t, "2")
+def bold(t): return c(t, "1")
+def green(t): return c(t, "32")
+def yellow(t): return c(t, "33")
+def red(t):  return c(t, "31")
+
+
+def run(cmd: list[str], timeout: int = 20) -> str | None:
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return p.stdout if p.returncode == 0 else None
+    except Exception:
+        return None
+
+
+# ── formatting helpers ────────────────────────────────────────────────────────
+
+def ago(ts: datetime | None, now: datetime) -> str:
+    """Human elapsed time. This is the number you actually read, so it must be
+    legible at a glance -- '4s ago', not an ISO timestamp to subtract by eye."""
+    if ts is None:
+        return "never"
+    s = (now - ts).total_seconds()
+    if s < 0:
+        return "just now"
+    if s < 60:
+        return f"{int(s)}s ago"
+    if s < 3600:
+        return f"{int(s // 60)}m ago"
+    if s < 86400:
+        return f"{int(s // 3600)}h {int((s % 3600) // 60)}m ago"
+    return f"{int(s // 86400)}d ago"
+
+
+def until(target: datetime, now: datetime) -> str:
+    s = (target - now).total_seconds()
+    if s < 0:
+        return "due"
+    if s < 60:
+        return f"in {int(s)}s"
+    return f"in {int(s // 60)}m"
+
+
+def parse_ts(v) -> datetime | None:
+    if not v or not isinstance(v, str):
+        return None
+    try:
+        d = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def human_bytes(n: float | int | None) -> str:
+    if n is None:
+        return "?"
+    n = float(n)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if abs(n) < 1024 or unit == "TB":
+            return f"{n:,.0f} {unit}" if unit == "B" else f"{n:,.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+def human_count(n: int | None) -> str:
+    if n is None:
+        return "?"
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}k"
+    return str(n)
+
+
+def bar(pct: float, width: int = 12) -> str:
+    filled = max(0, min(width, round(pct / 100 * width)))
+    glyph = "█" * filled + "·" * (width - filled)
+    if pct >= 85:
+        return red(glyph)
+    if pct >= 65:
+        return yellow(glyph)
+    return green(glyph)
+
+
+def dot(state: str) -> str:
+    return {"ok": green("●"), "warn": yellow("●"), "bad": red("●")}.get(state, "●")
+
+
+def row(label: str, value: str, extra: str = "") -> None:
+    print(f"    {dim(label.ljust(13))}{value.ljust(30)}{dim(extra)}")
+
+
+# ── feeds ─────────────────────────────────────────────────────────────────────
+
+def read_status(name: str) -> dict:
+    path = os.path.join(STATUS_DIR, f"{name}.json")
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def next_flush(now: datetime, minute: int) -> datetime:
+    """MBTA flushes at a fixed minute past the hour; bUCR on the hour boundary."""
+    cand = now.replace(minute=minute, second=0, microsecond=0)
+    if cand <= now:
+        cand += timedelta(hours=1)
+    return cand
+
+
+def feed_panel(title: str, name: str, now: datetime, *, cadence: str,
+               flush_minute: int, extra_lines: list[tuple[str, str, str]] | None = None) -> str:
+    st = read_status(name)
+    if not st:
+        print(f"  {dot('bad')} {bold(title.ljust(14))}{red('no status file')} {dim(STATUS_DIR)}")
+        print()
+        return "bad"
+
+    last_poll = parse_ts(st.get("last_poll_utc"))
+    age = (now - last_poll).total_seconds() if last_poll else None
+
+    # A collector is judged on whether data is still arriving, nothing else.
+    # A stale poll is the failure that matters; everything else is detail.
+    if age is None:
+        state, verdict = "bad", "never polled"
+    elif age > 300:
+        state, verdict = "bad", f"STALLED — no poll in {ago(last_poll, now)}"
+    elif age > 60:
+        state, verdict = "warn", f"slow — last poll {ago(last_poll, now)}"
+    else:
+        state, verdict = "ok", f"healthy · polling every {cadence}"
+
+    print(f"  {dot(state)} {bold(title.ljust(14))}{verdict}")
+
+    fetched, new = st.get("rows_fetched"), st.get("rows_new")
+    row("last poll", ago(last_poll, now),
+        f"fetched {fetched:,}, new {new:,}" if isinstance(fetched, int) and isinstance(new, int) else "")
+
+    spool_rows = st.get("spool_rows")
+    spool_bytes = st.get("spool_bytes")
+    nf = next_flush(now, flush_minute)
+    row("spool",
+        f"{spool_rows:,} rows · {human_bytes(spool_bytes)}" if isinstance(spool_rows, int) else "?",
+        f"next flush {nf:%H:%M} ({until(nf, now)})")
+
+    lf = parse_ts(st.get("last_flush_utc"))
+    lf_rows = st.get("last_flush_rows")
+    if lf:
+        key = st.get("last_flush_key") or ""
+        key = key.rsplit("/", 1)[-1] if "/" in key else key
+        row("last flush", ago(lf, now),
+            f"{lf_rows:,} rows" + (f" → {key}" if key else "") if isinstance(lf_rows, int) else "")
+    else:
+        row("last flush", dim("none yet"), "first flush lands on the next boundary")
+
+    for lbl, val, ext in (extra_lines or []):
+        row(lbl, val, ext)
+
+    # Errors are shown as a condition, not a log line: a stale last_error from
+    # hours ago is history, and rendering it like a live alarm is what made the
+    # previous version unreadable.
+    err_ts = parse_ts(st.get("last_error_utc"))
+    err = st.get("last_error")
+    if err and err_ts and (now - err_ts).total_seconds() < 3600:
+        short = str(err).split("\n")[0][:60]
+        row("errors", red(f"{ago(err_ts, now)}"), short)
+    elif err and err_ts:
+        row("errors", green("none recent"), f"last was {ago(err_ts, now)}")
+    else:
+        row("errors", green("none"), "")
+
+    print()
+    return state
+
+
+# ── storage ───────────────────────────────────────────────────────────────────
+
+def storage_panel(now: datetime) -> None:
+    print(f"  {bold('STORAGE')}  {dim('data.simovilab.org (MinIO)')}")
+
+    out = run(["mc", "admin", "info", "--json", ALIAS])
+    if not out:
+        row("status", red("unreachable"), "mc admin info failed")
+        print()
+        return
+
+    try:
+        info = json.loads(out).get("info", {})
+        drive = info["servers"][0]["drives"][0]
+    except Exception:
+        row("status", red("unparseable"), "")
+        print()
+        return
+
+    total, used = drive.get("totalspace", 0), drive.get("usedspace", 0)
+    disk_pct = used / total * 100 if total else 0
+    row("disk", f"{human_bytes(used)} / {human_bytes(total)}",
+        f"{bar(disk_pct)} {disk_pct:.0f}%")
+
+    used_i, free_i = drive.get("used_inodes", 0), drive.get("free_inodes", 0)
+    total_i = used_i + free_i
+    inode_pct = used_i / total_i * 100 if total_i else 0
+    row("inodes", f"{human_count(used_i)} / {human_count(total_i)}",
+        f"{bar(inode_pct)} {inode_pct:.0f}%")
+
+    objects = info.get("objects", {}).get("count")
+    # The runway is the number that matters. MinIO spends ~2.5 inodes per
+    # object; at the pre-2026-08-14 write pattern (~500k objects/day) this
+    # drive had roughly ten days of headroom, which is exactly how the
+    # original incident happened. At ~165/day it is effectively unbounded.
+    per_day = 165 * 2.5
+    runway_days = free_i / per_day if per_day else 0
+    if runway_days > 3650:
+        runway = green("years of headroom at the current write rate")
+    elif runway_days > 365:
+        runway = green(f"~{runway_days / 365:.0f}y at the current write rate")
+    elif runway_days > 90:
+        runway = yellow(f"~{runway_days:.0f}d — fine for the 90-day run")
+    else:
+        runway = red(f"~{runway_days:.0f}d — WILL RUN OUT before 90 days")
+    row("objects", f"{objects:,} total" if objects else "?", runway)
+
+    counts = {}
+    for label, prefix in (("mbta", "feeds/mbta/vehicle_positions_staging/"),
+                          ("bucr", "feeds/bucr/navsat_staging/")):
+        o = run(["mc", "ls", "--recursive", f"{ALIAS}/{BUCKET}/{prefix}"])
+        counts[label] = len(o.strip().splitlines()) if o and o.strip() else 0
+
+    total_staging = counts["mbta"] + counts["bucr"]
+    # Staging should drain nightly. A build-up means compaction is not running,
+    # which is silent otherwise -- polls and flushes keep looking healthy.
+    if total_staging > 60:
+        note = red("HIGH — nightly compaction may not be running")
+    elif total_staging == 0:
+        note = dim("all compacted")
+    else:
+        note = dim("awaiting nightly compaction (03:15 UTC)")
+    row("staging", f"mbta {counts['mbta']} · bucr {counts['bucr']}", note)
+    print()
+
+
+def host_panel() -> None:
+    print(f"  {bold('VPS')}      {dim(os.uname().nodename)}")
+
+    try:
+        du = shutil.disk_usage("/")
+        pct = du.used / du.total * 100
+        row("disk", f"{human_bytes(du.used)} / {human_bytes(du.total)}",
+            f"{bar(pct)} {pct:.0f}%")
+    except Exception:
+        row("disk", "?", "")
+
+    # `df -i` and `--output` are mutually exclusive on GNU coreutils, so parse
+    # the positional columns: Filesystem Inodes IUsed IFree IUse% Mounted
+    out = run(["df", "-i", "/"])
+    if out:
+        parts = out.strip().splitlines()[-1].split()
+        try:
+            total_i, used_i = int(parts[1]), int(parts[2])
+            ipct = used_i / total_i * 100 if total_i else 0
+            row("inodes", f"{human_count(used_i)} / {human_count(total_i)}",
+                f"{bar(ipct)} {ipct:.0f}%")
+        except (IndexError, ValueError):
+            pass
+
+    # Needs root; -n so it never blocks on a password prompt. Silently skipped
+    # if sudo is unavailable -- this is a nice-to-have, not a health signal.
+    out = run(["sudo", "-n", "du", "-sb", "/var/lib/docker/containers"])
+    if out:
+        try:
+            row("docker logs", human_bytes(int(out.split()[0])),
+                "rotation on (50 MB × 3)")
+        except (IndexError, ValueError):
+            pass
+
+    out = run(["docker", "ps", "--format", "{{.Names}}\t{{.Status}}"])
+    if out:
+        lines = [ln for ln in out.strip().splitlines() if ln.strip()]
+        relevant = [ln for ln in lines
+                    if any(k in ln for k in ("celery", "navsat", "redis", "postgres"))]
+        down = [ln.split("\t")[0] for ln in relevant if "Up" not in ln]
+        if down:
+            row("containers", red(f"{len(down)} not running"), ", ".join(down))
+        else:
+            row("containers", green(f"{len(relevant)} up"), "collectors, broker, db")
+    print()
+
+
+def main() -> int:
+    now = datetime.now(timezone.utc)
+    print()
+    print(f"  {bold('SIMOVI COLLECTORS')}{'':>8}{dim(now.strftime('%a %d %b %Y · %H:%M:%S UTC'))}")
+    print()
+
+    states = [
+        feed_panel("MBTA", "mbta", now, cadence="5s", flush_minute=2),
+        feed_panel("bUCR", "navsat", now, cadence="15s", flush_minute=0,
+                   extra_lines=[("window", "06:00–23:00 Costa Rica",
+                                 "open" if read_status("navsat").get("in_window") else "CLOSED — not polling")]),
+    ]
+    storage_panel(now)
+    host_panel()
+
+    if "bad" in states:
+        print(f"  {red('One or more collectors need attention.')}")
+        print(f"  {dim('logs: docker logs --tail 50 gtfs-rt-pipeline-celery-worker-1')}")
+        print()
+        return 1
+    print(f"  {dim('events: tail -f ' + STATUS_DIR + '/*.events.log')}")
+    print()
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)
