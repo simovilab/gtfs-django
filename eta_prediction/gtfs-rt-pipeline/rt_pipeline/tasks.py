@@ -470,6 +470,55 @@ def compact_vp_day(self) -> dict[str, Any]:
     return result
 
 
+# ---- Weekly static GTFS snapshots (roadmap 0.2) ----
+
+_STATIC_GTFS_SOURCES = {
+    "mbta": lambda: settings.MBTA_GTFS_STATIC_URL,
+    "bucr": lambda: settings.BUCR_GTFS_STATIC_URL,
+}
+
+
+@shared_task(bind=True, queue="maint")
+def snapshot_static_gtfs(self) -> dict[str, Any]:
+    """Weekly: download each agency's static GTFS and store it dated.
+
+    Static GTFS changes only occasionally, but without a dated snapshot the
+    realtime observations collected during the replication window can't be
+    matched back to the schedule that was in effect when they were recorded.
+    Uploads the zip as-is (no parsing) to
+    ``feeds/<agency>/gtfs_static/<ISO date>.zip``. Runs on the maint queue --
+    it never touches the VP spool, so the DuckDB single-writer constraint
+    that pins polling/flush to the fetch queue doesn't apply here.
+    """
+    from .storage.static_gtfs import StaticGtfsError, fetch, put_snapshot
+
+    today = _now().date()
+    results: dict[str, Any] = {}
+    for agency, url_getter in _STATIC_GTFS_SOURCES.items():
+        url = url_getter()
+        try:
+            content = fetch(url)
+            key = put_snapshot(content, agency, today)
+        except (StaticGtfsError, requests.RequestException) as exc:
+            logger.exception("snapshot_static_gtfs: %s failed", agency)
+            status.update(
+                agency, _status_dir(), event=True,
+                last_error=f"static GTFS snapshot failed: {exc}",
+                last_error_utc=_now().isoformat(),
+            )
+            results[agency] = {"error": str(exc)}
+            continue
+
+        status.update(
+            agency, _status_dir(), event=True,
+            last_static_snapshot_utc=_now().isoformat(),
+            last_static_snapshot_key=key,
+            last_static_snapshot_bytes=len(content),
+        )
+        results[agency] = {"key": key, "bytes": len(content)}
+    return results
+
+
 # ---- Celery Beat schedule ----
 from celery.schedules import crontab, schedule
 from ingestproj.celery import app as celery_app
@@ -495,5 +544,13 @@ celery_app.conf.beat_schedule = {
     "compact-vp-day": {
         "task": "rt_pipeline.tasks.compact_vp_day",
         "schedule": crontab(hour=settings.COMPACT_HOUR_UTC, minute=settings.COMPACT_MINUTE),
+    },
+    "snapshot-static-gtfs": {
+        "task": "rt_pipeline.tasks.snapshot_static_gtfs",
+        "schedule": crontab(
+            day_of_week=settings.STATIC_GTFS_SNAPSHOT_DOW,
+            hour=settings.STATIC_GTFS_SNAPSHOT_HOUR_UTC,
+            minute=settings.STATIC_GTFS_SNAPSHOT_MINUTE,
+        ),
     },
 }

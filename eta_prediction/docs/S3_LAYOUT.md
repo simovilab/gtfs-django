@@ -65,6 +65,24 @@ from rt_pipeline.storage import (
 local path in tests. `read_vehicle_positions` prunes on `route_ids` and the
 half-open UTC range `[start, end)`.
 
+## Static GTFS snapshots (roadmap 0.2)
+
+Weekly, unparsed, dated per agency — `rt_pipeline.storage.static_gtfs`,
+scheduled by `rt_pipeline.tasks.snapshot_static_gtfs` (Mondays 04:00 UTC by
+default; see `STATIC_GTFS_SNAPSHOT_*` in `.env.example`):
+
+```
+s3://transit/feeds/mbta/gtfs_static/<ISO date>.zip
+s3://transit/feeds/bucr/gtfs_static/<ISO date>.zip
+```
+
+The upstream zip is stored as-is (no parsing), after a sanity check that it
+actually contains `stops.txt`/`routes.txt` — a bad fetch (error page, empty
+body) raises rather than getting uploaded under a dated key that later steps
+would trust. Sources are per-agency env vars (`MBTA_GTFS_STATIC_URL`,
+`BUCR_GTFS_STATIC_URL`) — bUCR's is SIMOVI-served, not agency-served, and
+expected to move.
+
 ## Credentials (never hardcode)
 
 `rt_pipeline.storage.config.S3Config.from_env()` reads:

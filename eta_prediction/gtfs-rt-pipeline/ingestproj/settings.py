@@ -94,3 +94,18 @@ SPOOL_FLUSH_MINUTE = env.int("SPOOL_FLUSH_MINUTE", default=2)
 # --- Daily staging -> curated compaction ---
 COMPACT_HOUR_UTC = env.int("COMPACT_HOUR_UTC", default=3)
 COMPACT_MINUTE = env.int("COMPACT_MINUTE", default=15)
+
+# --- Weekly static GTFS snapshots (roadmap 0.2) ---
+# Dated, unparsed zip per agency so realtime observations collected during
+# the replication window can be matched back to the schedule in effect at
+# the time. bUCR's feed is served by SIMOVI itself, not the agency, so its
+# URL is expected to move -- always read from env, never hardcode.
+MBTA_GTFS_STATIC_URL = env(
+    "MBTA_GTFS_STATIC_URL", default="https://cdn.mbta.com/MBTA_GTFS.zip"
+)
+BUCR_GTFS_STATIC_URL = env(
+    "BUCR_GTFS_STATIC_URL", default="https://feeds.simovi.org/bucr/schedule/gtfs.zip"
+)
+STATIC_GTFS_SNAPSHOT_DOW = env.int("STATIC_GTFS_SNAPSHOT_DOW", default=1)  # Monday
+STATIC_GTFS_SNAPSHOT_HOUR_UTC = env.int("STATIC_GTFS_SNAPSHOT_HOUR_UTC", default=4)
+STATIC_GTFS_SNAPSHOT_MINUTE = env.int("STATIC_GTFS_SNAPSHOT_MINUTE", default=0)

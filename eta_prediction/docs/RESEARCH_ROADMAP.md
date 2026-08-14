@@ -5,8 +5,9 @@
 >
 > **v2 (2026-08-14):** Phase 0.1, 0.3 and 0.4 done — both collectors rebuilt on a
 > spool → hourly staging → daily compaction architecture and running on the Hetzner
-> VPS. See *Collector rebuild* below. 0.2 (static GTFS) and 0.5 (TripUpdates) remain
-> open; 0.2 is still the only item losing unrecoverable data.
+> VPS. See *Collector rebuild* below. 0.2 (static GTFS) is implemented — weekly
+> `snapshot_static_gtfs` task, both agencies, `feeds/<agency>/gtfs_static/<ISO
+> date>.zip` — but not yet deployed to the VPS; 0.5 (TripUpdates) remains open.
 >
 > Adds *Collection strategy*: a 90-day replication window (**2026-08-14 → 2026-11-12**)
 > collected in the background while the whole study is rehearsed end-to-end on the
@@ -293,7 +294,7 @@ data.**
 | # | Task | Size | Status |
 |---|---|---|---|
 | 0.1 | Restart the MBTA collector; add liveness monitoring | S | **Done 08-14.** Rebuilt rather than restarted — the original design was the cause of death. 5 s poll, `expires` so a backlog can never re-accumulate, `simovi-status` + status files for liveness |
-| 0.2 | Weekly static-GTFS snapshot task → `feeds/<agency>/gtfs_static/<ISO date>.zip`, for both agencies | S | **Urgent.** The 90-day replication window is being collected now; every week without dated snapshots makes part of it irreproducible |
+| 0.2 | Weekly static-GTFS snapshot task → `feeds/<agency>/gtfs_static/<ISO date>.zip`, for both agencies | S | **Implemented 08-14, not yet deployed.** `rt_pipeline.storage.static_gtfs` + `snapshot_static_gtfs` task (maint queue, Mondays 04:00 UTC), unit tests pass locally. Needs a VPS deploy plus `MBTA_GTFS_STATIC_URL`/`BUCR_GTFS_STATIC_URL` in the server `.env` (bUCR's is `feeds.simovi.org/bucr/schedule/gtfs.zip`) before it's live — still the only item losing unrecoverable data until then |
 | 0.3 | Fix the bUCR writer: batch to hourly objects instead of one row per file | M | **Done 08-14.** Durable DuckDB spool, hour-boundary flush, staging prefix. Window widened to 06:00–23:00 CR |
 | 0.3b | Re-partition bUCR by *event* date (`cr_datetime`), not ingestion date | M | **Open, deliberately deferred.** Stale device fixes (the 07-01 file holds `cr_datetime` back to 06-05) mean event-date partitioning has to merge into arbitrary past days. A `cr_datetime_utc` column was added instead, so this can be resolved in the builder rather than the collector |
 | 0.4 | Backfill-compact existing bUCR objects | S | **Done** — 44 days compacted, 1/day |
@@ -419,9 +420,10 @@ Phase 0 ──┬─→ Phase 1 ──┬─→ Phase 2 ──┐
                               └──────────────────────┘
 ```
 
-- Phase 0 is mostly landed (0.1/0.3/0.4 done 2026-08-14); data now accrues while other
-  work proceeds. What remains — 0.2 static GTFS, 0.5 TripUpdates, and the two deferred
-  sub-items — is independent of everything downstream except the ablation grid (6.2).
+- Phase 0 is mostly landed (0.1/0.3/0.4 done, 0.2 implemented but not deployed, all
+  2026-08-14); data now accrues while other work proceeds. What remains — 0.2's VPS
+  deploy, 0.5 TripUpdates, and the two deferred sub-items — is independent of
+  everything downstream except the ablation grid (6.2).
 - Phase 1 blocks everything downstream.
 - Phases 2 and 4 are independent of each other and can interleave.
 - Phase 3 needs Phase 2 (bUCR data) only for the cross-agency arm; the MBTA arm can start as soon as Phase 1 lands.
