@@ -3,10 +3,12 @@
 > Status: draft v2, 2026-08-14. Supersedes nothing; complements `REFACTOR_PLAN.md`
 > (which covered the completed schema-alignment + S3 migration, Phases A–E).
 >
-> **v2 (2026-08-14):** Phase 0.1, 0.2, 0.3 and 0.4 done — both collectors rebuilt on a
-> spool → hourly staging → daily compaction architecture, plus weekly static-GTFS
-> snapshots for both agencies, all running on the Hetzner VPS. See *Collector rebuild*
-> below. 0.5 (TripUpdates) remains open.
+> **v2 (2026-08-14):** Phase 0.1, 0.2, 0.3, 0.4 and 0.4b done — both collectors rebuilt on
+> a spool → hourly staging → daily compaction architecture, weekly static-GTFS snapshots
+> for both agencies, and the 28 historical MBTA days re-compacted with dedup, all running
+> on / verified against the Hetzner VPS. See *Collector rebuild* below. Also corrected the
+> archive's daily-volume estimate, which turned out to be theoretical and wrong (real
+> measured volume is several times denser). 0.5 (TripUpdates) remains open.
 >
 > Adds *Collection strategy*: a 90-day replication window (**2026-08-14 → 2026-11-12**)
 > collected in the background while the whole study is rehearsed end-to-end on the
@@ -148,19 +150,22 @@ data-poor regime the paper is about.
 - **No schedule baseline.** `scheduled_arrival`/`scheduled_travel_time` were dropped in
   `653e54f`. "Better than the published timetable?" is a mandatory comparator for a transit
   ETA paper.
-- **Data duplication — still present in the historical archive.** 5 s polling against a
-  slower feed yields **1.85×** duplicate `(vehicle_id, ts)` rows (Green-E, 07-09:
-  21 090 → 11 376 unique). Data collected from 2026-08-14 onward is dedup'd at three
-  stages, but the Aug 1 compaction merged with a bare `SELECT *` and **no dedup**, so all
-  28 pre-existing days still carry it. Until the re-compaction in 0.4b, the archive is
-  internally inconsistent: old days duplicated, new days not. Any dataset-size ablation
-  spanning the boundary is measuring two different things.
-- **The historical archive was collected at ~80 s cadence, not 5 s.** Four fork workers
-  each taking ~331 s per poll gave one completed poll every ~82 s, so the 2026-07 data has
-  ~563 k rows/day where a true 5 s poll yields ~12 M. This is a *research* fact, not an
-  ops one: position-fix resolution in the historical window is ~16× coarser than in
-  everything collected from 08-14 onward, which matters most for the segment-based
-  reformulation (Phase 3) where traversal times are derived from consecutive fixes.
+- ~~**Data duplication — still present in the historical archive.**~~ **Fixed 08-14
+  (0.4b).** 5 s polling against a slower feed produced duplicate `(vehicle_id, ts)` rows
+  (Green-E, 07-09: 21 090 → 11 376 unique, ~1.85×), and the Aug 1 compaction had merged
+  with a bare `SELECT *` and no dedup. All 28 historical days have now been re-compacted
+  with dedup: 4,601/4,601 leaves rewritten, spot-checked files show 0 duplicate keys. The
+  archive is now internally consistent — old and new days both dedup'd.
+- **The historical archive was collected at coarser-than-5s cadence, not 5 s.** The
+  original ~563 k rows/day figure was a theoretical estimate (4 fork workers ÷ 331 s/poll,
+  the rate right before the OOM crash) and turned out to be wrong — **0.4b's backfill
+  measured the real post-dedup total directly**: day 1 = 1,334,616 rows, day 8 = 1,574,494,
+  day 15 = 820,659. Real daily volume is ~0.8–1.6 M rows, several times denser than the old
+  estimate implied (the 331 s/poll rate clearly didn't hold for the whole month — most of
+  it ran faster, with the fan-out only reaching its worst point near the 07-29 crash). Still
+  coarser than a true 5 s poll's ~12 M/day, but not by the ~16× the old figure implied. This
+  is a *research* fact, not an ops one: matters most for the segment-based reformulation
+  (Phase 3) where traversal times are derived from consecutive fixes.
   Either restrict the study window to one regime or downsample the new data to match, and
   say which in the paper.
 - **DuckDB silently reinterprets tz-aware timestamps in the host's zone.** Inserting a
@@ -227,7 +232,7 @@ same kind of data, and treating rehearsal numbers as preliminary results would b
 | | Rehearsal (28 days, 2026-07) | Replication (90 days, 08-14 →) |
 |---|---|---|
 | effective cadence | ~80 s between fixes | 5 s |
-| duplication | 1.85× until 0.4b runs | deduplicated at write |
+| duplication | 1.85×, fixed 08-14 (0.4b) | deduplicated at write |
 | rows/day | ~563 k | ~3–4 M unique |
 | static GTFS | no dated snapshot | snapshotted from 0.2 onward |
 
@@ -239,11 +244,10 @@ numbers; use the rehearsal to fix the *method*.
 
 **Consequences for the phases below:**
 
-- **0.2 (static GTFS) becomes urgent, not merely open.** The replication window is being
-  collected right now; every week without dated snapshots makes part of it irreproducible.
-- **0.4b (re-compact the 28 days with dedup) is promoted.** The rehearsal should mirror
-  replication conditions as closely as it can, and 1.85× duplication in the rehearsal
-  corpus would exercise the splits and the models under conditions that will never recur.
+- **0.2 (static GTFS)** is done — see Phase 0 below.
+- **0.4b (re-compact the 28 days with dedup)** is done — see Phase 0 below. Also
+  corrected the archive's known daily-volume estimate along the way: real measured
+  volume is several times denser than the old theoretical figure (~563k/day) implied.
 - **Phase 6.1 freezes *two* test periods**, one per corpus, using identical selection
   logic.
 - Down-sampling the replication corpus to ~80 s is worth running as a **deliberate
@@ -297,7 +301,7 @@ data.**
 | 0.3 | Fix the bUCR writer: batch to hourly objects instead of one row per file | M | **Done 08-14.** Durable DuckDB spool, hour-boundary flush, staging prefix. Window widened to 06:00–23:00 CR |
 | 0.3b | Re-partition bUCR by *event* date (`cr_datetime`), not ingestion date | M | **Open, deliberately deferred.** Stale device fixes (the 07-01 file holds `cr_datetime` back to 06-05) mean event-date partitioning has to merge into arbitrary past days. A `cr_datetime_utc` column was added instead, so this can be resolved in the builder rather than the collector |
 | 0.4 | Backfill-compact existing bUCR objects | S | **Done** — 44 days compacted, 1/day |
-| 0.4b | Re-compact the 28 existing MBTA days **with dedup** | S | **Promoted** — the 28 days are now the rehearsal corpus, and 1.85× duplication would exercise splits and models under conditions that never recur. 15.7 M → ~8.5 M rows |
+| 0.4b | Re-compact the 28 existing MBTA days **with dedup** | S | **Done 08-14.** Added a `--force` flag to compaction (the routine skip-guard treats any leaf holding a compacted `<date>.parquet` as already done, which blocked re-running dedup on it). Ran live: 4,601/4,601 leaves rewritten, 0 errors, spot-checked files show 0 duplicate keys. Also corrected the record — the old "15.7 M → ~8.5 M" estimate was theoretical and wrong; real measured per-day post-dedup volume is 0.8–1.6 M rows (day 1/8/15 sampled directly), several times denser than assumed |
 | 0.5 | Schedule `poll_trip_updates_s3` → `feeds/<agency>/trip_updates/`, mirroring the VP storage layer. Not urgent for the head-to-head, which `etaval` does live — this exists so the ablation grid (6.2) can replay one fixed window | M | Open |
 
 **Verification (0.1/0.3/0.4, confirmed on the VPS 2026-08-14):** MBTA poll age 0.3 s and
@@ -317,7 +321,7 @@ flush wrote 59 776 rows in 3.9 s; a 23 157-row staging object held 0 duplicate k
 | 1.1 | Make timezone and holiday region per-agency config, sourced from one place, consumed identically by builder and estimator. Add a test asserting builder/serving temporal features match for the same timestamp | S |
 | 1.2 | Resolve the train/serve geometry skew: either ship shapes to the serving path (preferred — `etaval`'s `MLModelPredictor` already does this) or drop the three shape features from the contract. Do not keep silent proxies | M |
 | 1.3 | Record the arrival-detection branch as a dataset column (`arrival_method` ∈ `within_50m`/`closest_approach_200m`/`stopped_at`); stamp `arrival_source` into dataset metadata and `ModelKey` | S |
-| 1.4 | ~~Deduplicate `(feed_name, vehicle_id, ts)` at write time~~ — **done 08-14** for data collected from then on (spool `ON CONFLICT`, flush, and compaction). Remaining work: make `dedup=True` the non-optional default on *read*, so the 28 un-deduplicated historical days cannot be trained on by accident before 0.4b lands | S |
+| 1.4 | ~~Deduplicate `(feed_name, vehicle_id, ts)` at write time~~ — **done 08-14** (spool `ON CONFLICT`, flush, and compaction), and the 28 historical days are now deduplicated at rest too (0.4b). Remaining, lower-stakes: make `dedup=True` the non-optional default on *read* rather than an opt-out, as defense in depth | S |
 | 1.5 | Make `backfill_s3` idempotent (delete-then-write per partition, or content-hash filenames) | S |
 | 1.6 | Fix or retire the Bytewax path. Retiring is defensible — Prefect works and two serving paths is one too many for a solo project | S |
 
@@ -419,9 +423,10 @@ Phase 0 ──┬─→ Phase 1 ──┬─→ Phase 2 ──┐
                               └──────────────────────┘
 ```
 
-- Phase 0 is mostly landed (0.1/0.2/0.3/0.4 done 2026-08-14); data now accrues while
-  other work proceeds. What remains — 0.5 TripUpdates and the two deferred sub-items —
-  is independent of everything downstream except the ablation grid (6.2).
+- Phase 0 is landed except 0.5 (0.1/0.2/0.3/0.4/0.4b done 2026-08-14); data now accrues
+  while other work proceeds, and the historical archive is dedup'd and internally
+  consistent. What remains — 0.5 TripUpdates and the deferred 0.3b sub-item — is
+  independent of everything downstream except the ablation grid (6.2).
 - Phase 1 blocks everything downstream.
 - Phases 2 and 4 are independent of each other and can interleave.
 - Phase 3 needs Phase 2 (bUCR data) only for the cross-agency arm; the MBTA arm can start as soon as Phase 1 lands.
