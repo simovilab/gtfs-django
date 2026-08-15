@@ -8,17 +8,49 @@ Storage contract for collected GTFS-RT VehiclePositions. Read/written by
 
 ```
 s3://transit/feeds/mbta/vehicle_positions/
-    year=<YYYY>/month=<M>/day=<D>/route_id=<route_id>/<uuid>_<i>.parquet
+    year=<YYYY>/month=<M>/day=<D>/route_id=<route_id>/<ISO date>.parquet
 ```
 
 - **Day-level time leaf** (not hourly): keeps file counts manageable across
   MBTA's many routes while still pruning by date.
 - **`route_id` innermost**: per-route reads (the dataset-builder's primary
   access pattern) prune to matching prefixes — route filtering is cheap.
-- **File naming**: each write batch uses a uuid prefix, so repeated polls
-  append into existing partitions without clobbering. No compaction needed
-  short-term; a periodic compaction job is a later optimization.
+- **Exactly one file per (day, route)**, named by date. This is the
+  *curated* layout, written only by daily compaction (see *Write path*
+  below) — nothing writes here per-poll anymore. Verified 2026-08-14 across
+  all 4,601 leaves in the 28-day historical corpus: one correctly-named file
+  each, no strays.
 - **Compression**: `zstd` (better ratio than snappy for cold storage).
+
+## Write path: poll → spool → staging → curated
+
+Polls never touch this layout directly — the pre-2026-08-14 design did
+(`COPY ... PARTITION_BY (..., route_id)` per poll, one uuid-named file per
+batch) and that fan-out is what exhausted MinIO's inodes. The current path:
+
+1. **Poll** (`rt_pipeline.tasks.poll_vehicle_positions_s3`, every
+   `POLL_SECONDS`) appends parsed rows to a local DuckDB spool
+   (`rt_pipeline.storage.spool.Spool`, `SPOOL_PATH`). Dedup on insert via
+   `ON CONFLICT DO NOTHING` on the natural key below. No S3 write.
+2. **Hourly flush** (`flush_vp_spool_s3`, `SPOOL_FLUSH_MINUTE` past the
+   hour) writes everything older than the current UTC hour as **one file
+   per (year, month, day)** — no `route_id` split — to
+   `s3://transit/feeds/mbta/vehicle_positions_staging/year=/month=/day=/`.
+   Write-then-verify-then-delete from the spool, so a crash mid-flush never
+   loses rows.
+3. **Daily compaction** (`compact_vp_day`, `COMPACT_HOUR_UTC:COMPACT_MINUTE`
+   UTC, `rt_pipeline.compaction`) closes out each finished UTC day: unions
+   that day's staging objects with anything already curated for it, dedups
+   (`QUALIFY row_number() ... = 1`, keeping the latest `ingested_at`),
+   re-partitions by `route_id`, and writes the curated layout above. Only
+   deletes the staging objects once the curated output is verified
+   (`rows_out <= rows_in`, `rows_out > 0`). Never touches the still-open
+   current UTC day.
+
+A **one-time historical backfill** (roadmap 0.4b, 2026-08-14) re-ran step 3
+with `--force` against the 28 pre-rebuild July days, which the routine
+already-compacted guard would otherwise skip forever — they had a `<date>.parquet`
+file already (from an earlier, non-deduped compaction), just not a deduped one.
 
 ## Parquet file schema
 

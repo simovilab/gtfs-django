@@ -87,6 +87,13 @@ for pred in result["predictions"]:
 
 ### Phase 1: Data Ingestion (gtfs-rt-pipeline)
 
+> ⚠️ The steps below describe the original Postgres-based ingestion and are
+> out of date as of the 2026-08-14 collector rebuild — VP polling now spools
+> locally and flushes to S3 (see `RUNBOOK.md` and `S3_LAYOUT.md`), no
+> Postgres involved. Left here for the Docker/env setup steps, which are
+> still accurate; don't rely on the "Verify ingestion" `VehiclePosition`
+> check below.
+
 The Django + Celery pipeline ingests GTFS-RT feeds into PostgreSQL.
 
 ```bash

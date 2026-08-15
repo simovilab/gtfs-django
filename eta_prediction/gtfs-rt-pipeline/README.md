@@ -1,5 +1,17 @@
 # 🚍 GTFS-RT Ingestion Pipeline
 
+> ⚠️ **This README describes the original Postgres-only design and is out of
+> date.** VP ingestion no longer writes to Postgres — it polls into a local
+> DuckDB spool, flushes hourly to S3, and compacts nightly (rebuilt
+> 2026-08-14 after the original per-poll-S3-write design exhausted MinIO's
+> inodes). For the current architecture, commands, and known issues, see:
+> - `eta_prediction/docs/RUNBOOK.md` — operational commands
+> - `eta_prediction/docs/S3_LAYOUT.md` — storage contract
+> - `eta_prediction/docs/RESEARCH_ROADMAP.md` — full history + current state
+>
+> Setup steps below (Docker Compose, `.env`, ports) are still accurate; the
+> "How It Works" and "Current Status" sections below are not.
+
 A Django + Celery + Redis workflow for ingesting **GTFS-Realtime feeds** (Vehicle Positions and Trip Updaes protobufs `.pb`) into **PostgreSQL**.  
 ---
 

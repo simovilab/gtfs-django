@@ -154,8 +154,22 @@ data-poor regime the paper is about.
   (0.4b).** 5 s polling against a slower feed produced duplicate `(vehicle_id, ts)` rows
   (Green-E, 07-09: 21 090 → 11 376 unique, ~1.85×), and the Aug 1 compaction had merged
   with a bare `SELECT *` and no dedup. All 28 historical days have now been re-compacted
-  with dedup: 4,601/4,601 leaves rewritten, spot-checked files show 0 duplicate keys. The
-  archive is now internally consistent — old and new days both dedup'd.
+  with dedup: 4,601/4,601 leaves rewritten, 0 errors. A full 28-day scan (not just a
+  spot-check) confirms the backfill worked as intended: **32,192,234 rows total, 1,027
+  residual duplicate `(feed_name, vehicle_id, ts)` keys (~0.0032%)**, present in every one
+  of the 28 days at a consistent ~7–55 keys/day rate. These residuals are not a defect in
+  0.4b — they're a structural blind spot, documented below. The archive is otherwise
+  internally consistent — old and new days both dedup'd to the same standard.
+- **Known residual dedup gap: same `(vehicle_id, ts)` under two different routes.** The
+  natural dedup key `(feed_name, vehicle_id, ts)` deliberately excludes `route_id`, but the
+  curated layout partitions by `route_id` and compaction dedups per-partition — so a vehicle
+  reassigned mid-trip (two polls ~20 s apart, same vehicle+ts, different route_id/trip_id)
+  produces one surviving row per route, invisible to per-partition dedup. Confirmed via a
+  concrete example (vehicle y3121) to be a live MBTA source-feed artifact, not a pipeline
+  bug — and it applies to the ongoing 90-day collection too, not just the historical corpus.
+  1,027 / 32,192,234 rows (~0.0032%) is small enough to leave as a known limitation rather
+  than re-architecting dedup to be cross-partition; note it in the paper's data-quality
+  section rather than fixing it.
 - **The historical archive was collected at coarser-than-5s cadence, not 5 s.** The
   original ~563 k rows/day figure was a theoretical estimate (4 fork workers ÷ 331 s/poll,
   the rate right before the OOM crash) and turned out to be wrong — **0.4b's backfill
@@ -301,7 +315,7 @@ data.**
 | 0.3 | Fix the bUCR writer: batch to hourly objects instead of one row per file | M | **Done 08-14.** Durable DuckDB spool, hour-boundary flush, staging prefix. Window widened to 06:00–23:00 CR |
 | 0.3b | Re-partition bUCR by *event* date (`cr_datetime`), not ingestion date | M | **Open, deliberately deferred.** Stale device fixes (the 07-01 file holds `cr_datetime` back to 06-05) mean event-date partitioning has to merge into arbitrary past days. A `cr_datetime_utc` column was added instead, so this can be resolved in the builder rather than the collector |
 | 0.4 | Backfill-compact existing bUCR objects | S | **Done** — 44 days compacted, 1/day |
-| 0.4b | Re-compact the 28 existing MBTA days **with dedup** | S | **Done 08-14.** Added a `--force` flag to compaction (the routine skip-guard treats any leaf holding a compacted `<date>.parquet` as already done, which blocked re-running dedup on it). Ran live: 4,601/4,601 leaves rewritten, 0 errors, spot-checked files show 0 duplicate keys. Also corrected the record — the old "15.7 M → ~8.5 M" estimate was theoretical and wrong; real measured per-day post-dedup volume is 0.8–1.6 M rows (day 1/8/15 sampled directly), several times denser than assumed |
+| 0.4b | Re-compact the 28 existing MBTA days **with dedup** | S | **Done 08-14.** Added a `--force` flag to compaction (the routine skip-guard treats any leaf holding a compacted `<date>.parquet` as already done, which blocked re-running dedup on it). Ran live: 4,601/4,601 leaves rewritten, 0 errors. Full 28-day verification scan: 32,192,234 rows, 1,027 residual duplicate keys (~0.0032%) — all attributable to the cross-route reassignment gap noted above, not a backfill defect. Also corrected the record — the old "15.7 M → ~8.5 M" estimate was theoretical and wrong; real measured per-day post-dedup volume is 0.8–1.6 M rows (day 1/8/15 sampled directly), several times denser than assumed |
 | 0.5 | Schedule `poll_trip_updates_s3` → `feeds/<agency>/trip_updates/`, mirroring the VP storage layer. Not urgent for the head-to-head, which `etaval` does live — this exists so the ablation grid (6.2) can replay one fixed window | M | Open |
 
 **Verification (0.1/0.3/0.4, confirmed on the VPS 2026-08-14):** MBTA poll age 0.3 s and
