@@ -149,6 +149,54 @@ def test_staging_to_curated_second_run_with_no_new_staging_is_skipped(tmp_path, 
     assert days_again == []  # nothing left to fold in -- not rediscovered at all
 
 
+def test_staging_to_curated_many_routes_each_get_exactly_one_file(tmp_path, store, duck):
+    """Regression test for the 2026-08-14 production incident: DuckDB's own
+    `PARTITION_BY` writer produced 2-4 files for dozens of route partitions
+    on the first automatic run, even under `PRAGMA threads=1`, tripping
+    `_promote_partitioned`'s one-file-per-cell guard and leaving that day's
+    curated output incomplete. `compact_partitioned` now writes each
+    partition cell with its own explicit single-file `COPY` instead, so this
+    asserts every route in a many-route batch lands as exactly one file with
+    exactly its own rows -- no cross-partition contamination, no extras.
+    """
+    routes = ["11", "39", "57", "101", "Green-E"]
+    for i, route in enumerate(routes):
+        write_parquet(
+            tmp_path,
+            f"{MBTA_STAGING}/hour{i:02d}.parquet",
+            mbta_rows(
+                [f"v-{route}-a", f"v-{route}-b"],
+                dt.datetime(2026, 7, 8, i, 0, 0),
+                dt.datetime(2026, 7, 8, i, 2, 0),
+                route_id=route,
+                include_route_id=True,
+            ),
+        )
+
+    day = _discover_one_day(store)
+    result = process_staging_day(day, store, duck, dry_run=False)
+
+    assert result.kind == "compacted"
+    assert result.rows_in == 10
+    assert result.rows_out == 10
+
+    for route in routes:
+        route_dir = tmp_path / MBTA_CURATED / f"route_id={route}"
+        files = list(route_dir.glob("*.parquet"))
+        assert len(files) == 1, f"route {route}: expected 1 file, got {len(files)}"
+        # hive_partitioning=false so reading the lone file doesn't auto-reconstruct
+        # route_id from its own parent directory name -- this checks what's
+        # actually stored in the file, not a read-path artifact.
+        out = duck.con.execute(
+            f"SELECT * FROM read_parquet('{files[0]}', hive_partitioning=false)"
+        ).df()
+        assert sorted(out["vehicle_id"]) == [f"v-{route}-a", f"v-{route}-b"]
+        assert "route_id" not in out.columns  # reconstructed from the path, not stored in-file
+
+    # the scratch mirror is fully cleaned up, nothing left behind
+    assert not (tmp_path / "_staging" / MBTA_CURATED).exists()
+
+
 def test_bucr_staging_to_curated_single_file_per_day(tmp_path, store, duck):
     from .factories import bucr_rows
 

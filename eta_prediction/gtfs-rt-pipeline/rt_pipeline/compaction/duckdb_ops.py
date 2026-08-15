@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
+from urllib.parse import quote
 
 import duckdb
 
@@ -192,17 +193,27 @@ class DuckDB:
         partition_cols: Sequence[str],
     ) -> CompactionCounts:
         """Union every file matching `sources`, dedup, write partitioned by
-        `partition_cols` under `dst_dir_uri`.
+        `partition_cols` under `dst_dir_uri`, one file per partition cell.
 
         `sources` is a list of ``(glob_pattern, hive_partitioning)`` pairs,
         see `compact_leaf`. The curated side of a staging->curated union
         typically needs ``hive_partitioning=True`` -- it stores its
         partition columns (e.g. `route_id`) only in the path, so they must
         be reconstructed to appear as real columns again before they can be
-        re-partitioned. Forces single-threaded execution for the COPY so
-        each partition cell gets exactly one output file (callers rename it
-        deterministically afterwards) rather than a thread-count-dependent
-        number of files.
+        re-partitioned.
+
+        Writes each partition cell with its own single-file `COPY` -- the
+        same technique `compact_leaf` uses -- rather than DuckDB's own
+        `PARTITION_BY` writer. `PARTITION_BY` was tried first, including
+        `PRAGMA threads=1` to force one output file per cell, but production
+        data still produced 2-4 files for dozens of MBTA route partitions on
+        the first automatic run (2026-08-14): the partitioned Parquet
+        writer's own internal sink parallelism isn't fully governed by that
+        pragma. Filtering into per-cell `COPY` calls sidesteps that writer
+        path entirely, at the cost of one extra table scan per distinct
+        partition value -- dedup'd rows are materialized into a temp table
+        first so that cost is a cheap in-memory scan, not a re-run of the
+        union + dedup per cell.
         """
         read_sql, _ = self._source_sql(sources)
         if read_sql is None:
@@ -210,21 +221,36 @@ class DuckDB:
 
         dedup_sql = self._dedup_sql(read_sql, dedup_keys, recency_col)
         src = self.con.execute(f"SELECT count(*) FROM ({read_sql})").fetchone()[0]
-        dst = self.con.execute(f"SELECT count(*) FROM ({dedup_sql})").fetchone()[0]
-        if dst == 0:
-            return CompactionCounts(src, 0)
 
-        part_cols = ", ".join(partition_cols)
-        copy_sql = (
-            f"COPY (SELECT * FROM ({dedup_sql}) ORDER BY {sort_col}) TO {_lit(dst_dir_uri)} "
-            f"(FORMAT PARQUET, PARTITION_BY ({part_cols}), COMPRESSION 'zstd', "
-            "ROW_GROUP_SIZE 122880, OVERWRITE_OR_IGNORE TRUE)"
+        part_col_list = ", ".join(partition_cols)
+        self.con.execute("DROP TABLE IF EXISTS _compact_partitioned")
+        self.con.execute(
+            f"CREATE TEMP TABLE _compact_partitioned AS "
+            f"SELECT * FROM ({dedup_sql}) ORDER BY {part_col_list}, {sort_col}"
         )
-        _prepare_local_dst(dst_dir_uri, is_dir=True)
-        prev_threads = self.con.execute("SELECT current_setting('threads')").fetchone()[0]
-        self.con.execute("PRAGMA threads=1")
         try:
-            self.con.execute(copy_sql)
+            dst = self.con.execute("SELECT count(*) FROM _compact_partitioned").fetchone()[0]
+            if dst == 0:
+                return CompactionCounts(src, 0)
+
+            cells = self.con.execute(
+                f"SELECT DISTINCT {part_col_list} FROM _compact_partitioned"
+            ).fetchall()
+            for cell in cells:
+                where = " AND ".join(
+                    f"{col} = {_lit(str(val))}" for col, val in zip(partition_cols, cell)
+                )
+                part_dir = "/".join(
+                    f"{col}={quote(str(val), safe='')}"
+                    for col, val in zip(partition_cols, cell)
+                )
+                file_uri = f"{dst_dir_uri.rstrip('/')}/{part_dir}/data_0.parquet"
+                _prepare_local_dst(file_uri, is_dir=False)
+                self.con.execute(
+                    f"COPY (SELECT * EXCLUDE ({part_col_list}) FROM _compact_partitioned "
+                    f"WHERE {where} ORDER BY {sort_col}) TO {_lit(file_uri)} "
+                    "(FORMAT PARQUET, COMPRESSION 'zstd', ROW_GROUP_SIZE 122880)"
+                )
         finally:
-            self.con.execute(f"PRAGMA threads={prev_threads}")
+            self.con.execute("DROP TABLE IF EXISTS _compact_partitioned")
         return CompactionCounts(src, dst)
