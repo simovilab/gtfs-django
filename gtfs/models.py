@@ -303,9 +303,13 @@ class BaseStopTime(models.Model):
     )
     pickup_type = models.PositiveIntegerField(
         help_text="Tipo de recogida de pasajeros.",
+        blank=True,
+        null=True,
     )
     drop_off_type = models.PositiveIntegerField(
         help_text="Tipo de bajada de pasajeros.",
+        blank=True,
+        null=True,
     )
     shape_dist_traveled = models.DecimalField(
         max_digits=6,
