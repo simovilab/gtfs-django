@@ -30,22 +30,26 @@ except Exception:  # pragma: no cover
 
 
 __all__ = [
-    "ColorField",
-    "CurrencyAmountField",
-    "CurrencyCodeField",
-    "EnumCharField",
-    "EnumIntegerField",
+    "GTFSColorField",
+    "GTFSCurrencyCodeField",
+    "GTFSCurrencyAmountField",
+    "GTFSEnumField",
     "GTFSEmailField",
     "GTFSIDField",
     "GTFSTextField",
     "GTFSTimeField",
     "GTFSLocalTimeField",
-    "LanguageCodeField",
-    "LatitudeField",
-    "LongitudeField",
-    "PhoneNumberField",
-    "ServiceDateField",
+    "GTFSLanguageCodeField",
+    "GTFSLatitudeField",
+    "GTFSLongitudeField",
+    "GTFSPhoneNumberField",
+    "GTFSDateField",
     "GTFSTimezoneField",
+    "GTFSNonNegativeIntegerField",
+    "GTFSNonZeroIntegerField",
+    "GTFSPositiveIntegerField",
+    "GTFSNonNegativeFloatField",
+    "GTFSPositiveFloatField",
     "gtfs_time_to_seconds",
     "normalize_gtfs_time",
 ]
@@ -121,7 +125,22 @@ def format_gtfs_timedelta(value: timedelta) -> str:
     return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
-class ColorField(models.CharField):
+def _validate_timezone(value: str) -> None:
+    if value is None or value == "":
+        return
+    if " " in value:
+        raise ValidationError("Timezone names must not contain spaces.")
+    if ZoneInfo is None:
+        return
+    try:
+        ZoneInfo(value)
+    except ZoneInfoNotFoundError as exc:
+        raise ValidationError(
+            "Enter a valid IANA timezone, e.g. 'America/Los_Angeles'."
+        ) from exc
+
+
+class GTFSColorField(models.CharField):
     """GTFS `Color` (six-digit hexadecimal, without leading '#')."""
 
     default_validators = [
@@ -149,7 +168,7 @@ class ColorField(models.CharField):
         return value
 
 
-class CurrencyCodeField(models.CharField):
+class GTFSCurrencyCodeField(models.CharField):
     """GTFS `Currency code` (ISO 4217 alphabetic code, e.g. 'EUR')."""
 
     default_validators = [
@@ -177,7 +196,7 @@ class CurrencyCodeField(models.CharField):
         return value
 
 
-class CurrencyAmountField(models.DecimalField):
+class GTFSCurrencyAmountField(models.DecimalField):
     """GTFS `Currency amount`.
 
     GTFS references ISO 4217 for the number of minor units (decimal places) for
@@ -191,7 +210,7 @@ class CurrencyAmountField(models.DecimalField):
         super().__init__(*args, **kwargs)
 
 
-class ServiceDateField(models.DateField):
+class GTFSDateField(models.DateField):
     """GTFS `Date` stored as a Django DateField.
 
     Accepts an 8-digit string in `YYYYMMDD` format in addition to `datetime.date`.
@@ -234,7 +253,7 @@ class GTFSEmailField(models.EmailField):
         super().__init__(*args, **kwargs)
 
 
-class EnumIntegerField(models.IntegerField):
+class GTFSEnumField(models.IntegerField):
     """GTFS `Enum` stored as an integer.
 
     Requires `choices`.
@@ -243,20 +262,7 @@ class EnumIntegerField(models.IntegerField):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         choices = kwargs.get("choices")
         if not choices:
-            raise TypeError("EnumIntegerField requires non-empty 'choices'.")
-        super().__init__(*args, **kwargs)
-
-
-class EnumCharField(models.CharField):
-    """GTFS `Enum` stored as a string.
-
-    Requires `choices`.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        choices = kwargs.get("choices")
-        if not choices:
-            raise TypeError("EnumCharField requires non-empty 'choices'.")
+            raise TypeError("GTFSEnumField requires non-empty 'choices'.")
         super().__init__(*args, **kwargs)
 
 
@@ -286,7 +292,7 @@ class GTFSIDField(models.CharField):
             )
 
 
-class LanguageCodeField(models.CharField):
+class GTFSLanguageCodeField(models.CharField):
     """GTFS `Language code` (BCP 47)."""
 
     default_validators = [
@@ -302,7 +308,7 @@ class LanguageCodeField(models.CharField):
         super().__init__(*args, **kwargs)
 
 
-class LatitudeField(models.DecimalField):
+class GTFSLatitudeField(models.DecimalField):
     """GTFS `Latitude` (WGS84, -90..90)."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -317,7 +323,7 @@ class LatitudeField(models.DecimalField):
         )
 
 
-class LongitudeField(models.DecimalField):
+class GTFSLongitudeField(models.DecimalField):
     """GTFS `Longitude` (WGS84, -180..180)."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -332,7 +338,86 @@ class LongitudeField(models.DecimalField):
         )
 
 
-class PhoneNumberField(models.CharField):
+class GTFSFloatField(models.DecimalField):
+    """GTFS `Float`."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("max_digits", 9)
+        kwargs.setdefault("decimal_places", 6)
+        super().__init__(*args, **kwargs)
+
+
+class GTFSIntegerField(models.IntegerField):
+    """GTFS `Integer`."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class GTFSNonNegativeIntegerField(models.IntegerField):
+    """GTFS integer constrained to values greater than or equal to zero."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs["validators"] = [*kwargs.get("validators", ()), MinValueValidator(0)]
+        super().__init__(*args, **kwargs)
+
+
+def _validate_non_zero_integer(value: int) -> None:
+    if value == 0:
+        raise ValidationError("Value must not be zero.")
+
+
+class GTFSNonZeroIntegerField(models.IntegerField):
+    """GTFS integer constrained to non-zero values."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs["validators"] = [
+            *kwargs.get("validators", ()),
+            _validate_non_zero_integer,
+        ]
+        super().__init__(*args, **kwargs)
+
+
+class GTFSPositiveIntegerField(models.IntegerField):
+    """GTFS integer constrained to values greater than zero."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs["validators"] = [*kwargs.get("validators", ()), MinValueValidator(1)]
+        super().__init__(*args, **kwargs)
+
+
+class GTFSNonNegativeFloatField(models.DecimalField):
+    """GTFS decimal constrained to values greater than or equal to zero."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("max_digits", 18)
+        kwargs.setdefault("decimal_places", 6)
+        kwargs["validators"] = [
+            *kwargs.get("validators", ()),
+            MinValueValidator(Decimal("0")),
+        ]
+        super().__init__(*args, **kwargs)
+
+
+def _validate_positive_float(value: Decimal) -> None:
+    if value <= 0:
+        raise ValidationError("Value must be greater than zero.")
+
+
+class GTFSPositiveFloatField(models.DecimalField):
+    """GTFS decimal constrained to values greater than zero."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("max_digits", 18)
+        kwargs.setdefault("decimal_places", 6)
+        kwargs["validators"] = [
+            *kwargs.get("validators", ()),
+            _validate_positive_float,
+        ]
+        super().__init__(*args, **kwargs)
+
+
+class GTFSPhoneNumberField(models.CharField):
     """GTFS `Phone number`.
 
     This keeps validation permissive to accommodate international formats.
@@ -349,34 +434,6 @@ class PhoneNumberField(models.CharField):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("max_length", 32)
         super().__init__(*args, **kwargs)
-
-
-class _BaseGTFSTimeField(models.CharField):
-    def __init__(
-        self,
-        *args: Any,
-        max_hour: int | None,
-        **kwargs: Any,
-    ) -> None:
-        self._max_hour = max_hour
-        kwargs.setdefault("max_length", 11)
-        super().__init__(*args, **kwargs)
-
-    def to_python(self, value: Any) -> Any:
-        value = super().to_python(value)
-        if value in (None, ""):
-            return value
-        if isinstance(value, str):
-            return normalize_gtfs_time(value, max_hour=self._max_hour)
-        return value
-
-    def get_prep_value(self, value: Any) -> Any:
-        value = super().get_prep_value(value)
-        if value in (None, ""):
-            return value
-        if isinstance(value, str):
-            return normalize_gtfs_time(value, max_hour=self._max_hour)
-        return value
 
 
 class GTFSTimeField(models.DurationField):
@@ -417,6 +474,34 @@ class GTFSTimeField(models.DurationField):
         return str(value)
 
 
+class _BaseGTFSTimeField(models.CharField):
+    def __init__(
+        self,
+        *args: Any,
+        max_hour: int | None,
+        **kwargs: Any,
+    ) -> None:
+        self._max_hour = max_hour
+        kwargs.setdefault("max_length", 11)
+        super().__init__(*args, **kwargs)
+
+    def to_python(self, value: Any) -> Any:
+        value = super().to_python(value)
+        if value in (None, ""):
+            return value
+        if isinstance(value, str):
+            return normalize_gtfs_time(value, max_hour=self._max_hour)
+        return value
+
+    def get_prep_value(self, value: Any) -> Any:
+        value = super().get_prep_value(value)
+        if value in (None, ""):
+            return value
+        if isinstance(value, str):
+            return normalize_gtfs_time(value, max_hour=self._max_hour)
+        return value
+
+
 class GTFSLocalTimeField(_BaseGTFSTimeField):
     """GTFS `Local time`.
 
@@ -435,21 +520,6 @@ class GTFSTextField(models.CharField):
         super().__init__(*args, **kwargs)
 
 
-def _validate_timezone(value: str) -> None:
-    if value is None or value == "":
-        return
-    if " " in value:
-        raise ValidationError("Timezone names must not contain spaces.")
-    if ZoneInfo is None:
-        return
-    try:
-        ZoneInfo(value)
-    except ZoneInfoNotFoundError as exc:
-        raise ValidationError(
-            "Enter a valid IANA timezone, e.g. 'America/Los_Angeles'."
-        ) from exc
-
-
 class GTFSTimezoneField(models.CharField):
     """GTFS `Timezone` (IANA tz database name)."""
 
@@ -457,3 +527,44 @@ class GTFSTimezoneField(models.CharField):
         kwargs.setdefault("max_length", 64)
         super().__init__(*args, **kwargs)
         self.validators.append(_validate_timezone)
+
+
+class GTFSURLField(models.URLField):
+    """GTFS `URL` (web address)."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("max_length", 2083)
+        super().__init__(*args, **kwargs)
+
+
+"""
+Color - A color encoded as a six-digit hexadecimal number. Refer to https://htmlcolorcodes.com to generate a valid value (the leading "#" must not be included).
+Example: FFFFFF for white, 000000 for black or 0039A6 for the A,C,E lines in NYMTA.
+Currency code - An ISO 4217 alphabetical currency code. For the list of current currency, refer to https://en.wikipedia.org/wiki/ISO_4217#Active_codes.
+Example: CAD for Canadian dollars, EUR for euros or JPY for Japanese yen.
+Currency amount - A decimal value indicating a currency amount. The number of decimal places is specified by ISO 4217 for the accompanying Currency code. All financial calculations should be processed as decimal, currency, or another equivalent type suitable for financial calculations depending on the programming language used to consume data. Processing currency amounts as float is discouraged due to gains or losses of money during calculations.
+Date - Service day in the YYYYMMDD format. Since time within a service day may be above 24:00:00, a service day may contain information for the subsequent day(s).
+Example: 20180913 for September 13th, 2018.
+Email - An email address.
+Example: example@example.com
+Enum - An option from a set of predefined constants defined in the "Description" column.
+Example: The route_type field contains a 0 for tram, a 1 for subway...
+ID - An ID field value is an internal ID, not intended to be shown to riders, and is a sequence of any UTF-8 characters. Using only printable ASCII characters is recommended. An ID is labeled "unique ID" when it must be unique within a file. IDs defined in one .txt file are often referenced in another .txt file. IDs that reference an ID in another table are labeled "foreign ID".
+Example: The stop_id field in stops.txt is a "unique ID". The parent_station field in stops.txt is a "foreign ID referencing stops.stop_id".
+Language code - An IETF BCP 47 language code. For an introduction to IETF BCP 47, refer to https://www.rfc-editor.org/info/rfc5646/ and http://www.w3.org/International/articles/language-tags/.
+Example: en for English, en-US for American English or de for German.
+Latitude - WGS84 latitude in decimal degrees. The value must be greater than or equal to -90.0 and less than or equal to 90.0.
+Example: 41.890169 for the Colosseum in Rome.
+Longitude - WGS84 longitude in decimal degrees. The value must be greater than or equal to -180.0 and less than or equal to 180.0.
+Example: 12.492269 for the Colosseum in Rome.
+Float - A floating point number.
+Integer - An integer.
+Phone number - A phone number.
+Time - Time in the HH:MM:SS format (H:MM:SS is also accepted). The time is measured from "noon minus 12h" of the service day (effectively midnight except for days on which daylight savings time changes occur). For times occurring after midnight on the service day, enter the time as a value greater than 24:00:00 in HH:MM:SS.
+Example: 14:30:00 for 2:30PM or 25:35:00 for 1:35AM on the next day.
+Local time - Time in the HH:MM:SS format (H:MM:SS is also accepted). Represents a wall-clock time shown in the local time of the specified location.
+Text - A string of UTF-8 characters, which is aimed to be displayed and which must therefore be human readable.
+Timezone - TZ timezone from the https://www.iana.org/time-zones. Timezone names never contain the space character but may contain an underscore. Refer to http://en.wikipedia.org/wiki/List_of_tz_zones for a list of valid values.
+Example: Asia/Tokyo, America/Los_Angeles or Africa/Cairo.
+URL - A fully qualified URL that includes http:// or https://, and any special characters in the URL must be correctly escaped. See the following http://www.w3.org/Addressing/URL/4_URI_Recommentations.html for a description of how to create fully qualified URL values.
+"""

@@ -4,6 +4,6 @@ icon: lucide/columns
 
 # Field Definitions
 
-## ColorField
+## GTFSColorField
 
-## CurrencyCodeField
+## GTFSCurrencyAmountField

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gtfs-django"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Django app for processing and managing GTFS (General Transit Feed Specification) data"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,8 @@ keywords = ["django", "gtfs", "transit", "schedule", "realtime"]
 dependencies = [
     "django>=5.2.0",
     "gtfs-realtime-bindings>=2.0.0",
+    "jinja2>=3.1.6",
+    "pyyaml>=6.0.2",
     "requests>=2.33.1",
 ]
 
@@ -39,8 +41,5 @@ dev = [
     "pytest-django>=4.11.1",
     "ruff>=0.13.0",
 ]
-docs = [
-    "mkdocstrings-python>=2.0.3",
-    "zensical>=0.0.33",
-]
+docs = ["mkdocstrings-python>=2.0.3", "zensical>=0.0.33"]
 testing = ["coverage[toml]>=7.10.6", "tox>=4.30.2"]

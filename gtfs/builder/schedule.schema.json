@@ -1,0 +1,555 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gtfs.org/schema/schedule.schema.json",
+  "title": "General Transit Feed Specification Reference Schema",
+  "description": "JSON Schema for GTFS Schedule Reference YAML structure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadata"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Metadata about the GTFS specification document",
+      "required": [
+        "name",
+        "revision_date",
+        "revision_history_url",
+        "description"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the GTFS specification reference"
+        },
+        "revision_date": {
+          "type": "string",
+          "description": "Revision date in YYYY-MM-DD format",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "revision_history_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the revision history"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the GTFS specification"
+        }
+      }
+    },
+    "document_conventions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Document conventions section",
+      "required": ["description"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Description of document conventions (RFC 2119 keywords)"
+        },
+        "term_definitions": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Term definitions section",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "terms": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["term", "definition"],
+                "properties": {
+                  "term": {
+                    "type": "string",
+                    "description": "Term being defined"
+                  },
+                  "definition": {
+                    "type": "string",
+                    "description": "Definition of the term"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "presence": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Presence conditions section",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "definition"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "Required",
+                      "Optional",
+                      "Conditionally Required",
+                      "Conditionally Forbidden",
+                      "Recommended"
+                    ]
+                  },
+                  "definition": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "field_types": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Field types section",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "types": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "definition"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "Color",
+                      "Currency code",
+                      "Currency amount",
+                      "Date",
+                      "Email",
+                      "Enum",
+                      "ID",
+                      "Language code",
+                      "Latitude",
+                      "Longitude",
+                      "Float",
+                      "Integer",
+                      "Phone number",
+                      "Time",
+                      "Local time",
+                      "Text",
+                      "Timezone",
+                      "URL"
+                    ]
+                  },
+                  "definition": {
+                    "type": "string"
+                  },
+                  "example": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "field_signs": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Field signs section",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "signs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "definition"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": ["Non-negative", "Non-zero", "Positive"]
+                  },
+                  "definition": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "dataset_attributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Dataset attributes section",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "attributes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "definition"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "definition": {
+                    "type": "string"
+                  },
+                  "example": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dataset_files": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Dataset files section",
+      "required": ["description", "files"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "presence", "description"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "GTFS file name"
+              },
+              "presence": {
+                "type": "string",
+                "enum": [
+                  "Required",
+                  "Optional",
+                  "Conditionally Required",
+                  "Conditionally Forbidden",
+                  "Recommended"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "conditions": {
+                "type": "string",
+                "description": "Conditional requirements for the file"
+              },
+              "notes": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Additional notes about the file"
+                  },
+                  {
+                    "type": "array",
+                    "description": "Additional notes about the file",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "file_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "File requirements section",
+      "required": ["description", "requirements"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "csv_example": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "original_value": {
+              "type": "string"
+            },
+            "csv_value": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "dataset_publishing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Dataset publishing and general practices section",
+      "required": ["description", "practices"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "practices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "field_definitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Field definitions section",
+      "required": ["description", "files"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "presence", "primary_key", "fields"],
+            "properties": {
+              "file": {
+                "type": "string",
+                "description": "GTFS file name (e.g., agency.txt, stops.txt)"
+              },
+              "description": {
+                "type": "string",
+                "description": "File-level description"
+              },
+              "explanation": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "File-level explanation block",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Explanation title"
+                  },
+                  "notes": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Explanation notes"
+                      },
+                      {
+                        "type": "array",
+                        "description": "Explanation notes",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "notes": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Additional file-level notes"
+                  },
+                  {
+                    "type": "array",
+                    "description": "Additional file-level notes",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              },
+              "presence": {
+                "type": "string",
+                "enum": [
+                  "Required",
+                  "Optional",
+                  "Conditionally Required",
+                  "Conditionally Forbidden",
+                  "Recommended"
+                ]
+              },
+              "primary_key": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "description": "Single primary key field name"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Array of field names for composite primary key",
+                    "minItems": 1
+                  }
+                ],
+                "description": "Primary key field(s) for the file. Can be a single field name or an array for composite keys."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/fieldDefinition"
+                }
+              },
+              "example": {
+                "type": "object",
+                "description": "File-level example block",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fieldDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Field name"
+        },
+        "type": {
+          "type": "string",
+          "description": "Field type (e.g., Text, ID, Enum, etc.)"
+        },
+        "presence": {
+          "type": "string",
+          "enum": [
+            "Required",
+            "Optional",
+            "Conditionally Required",
+            "Conditionally Forbidden",
+            "Recommended"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "Field description"
+        },
+        "example": {
+          "type": "string",
+          "description": "Example value or usage"
+        },
+        "foreign_key": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" }, "minItems": 2 }
+          ],
+          "description": "Foreign key reference (e.g., stops.stop_id), or a list when the spec allows alternative targets"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Conditional requirements for the field"
+        },
+        "notes": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Additional notes about the field"
+            },
+            {
+              "type": "array",
+              "description": "Additional notes about the field",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "options": {
+          "type": "array",
+          "description": "Enum options for Enum type fields",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["value", "description"],
+                "additionalProperties": false,
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "description": "Enum value"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Description of the enum value"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["category", "values"],
+                "additionalProperties": false,
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "Category for grouped enum values"
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["value", "description"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "children": {
+          "type": "array",
+          "description": "Nested child fields for hierarchical structures",
+          "items": {
+            "$ref": "#/$defs/fieldDefinition"
+          }
+        }
+      }
+    }
+  }
+}

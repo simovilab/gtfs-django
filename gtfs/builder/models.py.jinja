@@ -1,0 +1,32 @@
+from django.db import models
+
+from gtfs import fields as gtfs_fields
+
+# -------------
+# GTFS Schedule
+# -------------
+
+{% for file in files %}
+class {{ file.class_name }}(models.Model):
+    """{{ file.description }}
+
+    Maps to {{ file.file }}.
+    This model does not include primary keys."""
+
+{% for field in file.fields %}
+    {{ field.name }} = {{ field.field_module }}.{{ field.field_name }}(
+        help_text={{ field.description|python_repr }},
+{% if field.presence != "Required" or field.allow_empty_enum %}
+        blank=True,
+        null=True,
+{% endif %}
+{% if field.choices is defined %}
+        choices={{ field.choices|python_repr }},
+{% endif %}
+    )
+{% endfor %}
+    class Meta:
+        abstract = True
+
+
+{% endfor %}

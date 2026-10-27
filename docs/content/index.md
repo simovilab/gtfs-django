@@ -4,7 +4,7 @@ icon: lucide/rocket
 
 # gtfs-django
 
-`gtfs-django` is a Django app that provides **abstract models**, **custom fields** and **utility functions** for [GTFS](https://gtfs.org/) (General Transit Feed Specification) data, covering both static *Schedule* feeds and dynamic *Realtime* feed messages.
+`gtfs-django` is a Django app that provides **abstract models**, **custom fields** and **utility functions** for [GTFS](https://gtfs.org/) (General Transit Feed Specification) data, covering both static _Schedule_ feeds and dynamic _Realtime_ feed messages.
 
 Because all models are abstract, this package creates no database tables of its own. You subclass the models in your own Django app, giving you full control over your schema — adding foreign keys, extra fields, constraints, or any other customisations your project requires.
 
@@ -89,51 +89,50 @@ python manage.py migrate
 
 ### GTFS Schedule
 
-| Model | GTFS file | Description |
-|---|---|---|
-| `BaseAgency` | `agency.txt` | Transit agencies |
-| `BaseStop` | `stops.txt` | Stops and stations |
-| `BaseRoute` | `routes.txt` | Routes |
-| `BaseTrip` | `trips.txt` | Trips |
-| `BaseStopTime` | `stop_times.txt` | Arrival/departure times per stop |
-| `BaseCalendar` | `calendar.txt` | Weekly service schedules |
-| `BaseCalendarDate` | `calendar_dates.txt` | Service exceptions |
-| `BaseShape` | `shapes.txt` | Route shapes |
-| `BaseFareAttribute` | `fare_attributes.txt` | Fare definitions |
-| `BaseFareRule` | `fare_rules.txt` | Fare applicability rules |
-| `BaseFeedInfo` | `feed_info.txt` | Feed metadata |
+| Model               | GTFS file             | Description                      |
+| ------------------- | --------------------- | -------------------------------- |
+| `BaseAgency`        | `agency.txt`          | Transit agencies                 |
+| `BaseStop`          | `stops.txt`           | Stops and stations               |
+| `BaseRoute`         | `routes.txt`          | Routes                           |
+| `BaseTrip`          | `trips.txt`           | Trips                            |
+| `BaseStopTime`      | `stop_times.txt`      | Arrival/departure times per stop |
+| `BaseCalendar`      | `calendar.txt`        | Weekly service schedules         |
+| `BaseCalendarDate`  | `calendar_dates.txt`  | Service exceptions               |
+| `BaseShape`         | `shapes.txt`          | Route shapes                     |
+| `BaseFareAttribute` | `fare_attributes.txt` | Fare definitions                 |
+| `BaseFareRule`      | `fare_rules.txt`      | Fare applicability rules         |
+| `BaseFeedInfo`      | `feed_info.txt`       | Feed metadata                    |
 
 ### GTFS Realtime
 
-| Model | Description |
-|---|---|
-| `BaseFeedMessage` | Feed message header |
-| `BaseTripUpdate` | Real-time trip schedule updates |
-| `BaseStopTimeUpdate` | Per-stop arrival/departure updates |
-| `BaseVehiclePosition` | Live vehicle locations |
-| `BaseAlert` | Service alerts and disruptions |
+| Model                 | Description                        |
+| --------------------- | ---------------------------------- |
+| `BaseFeedMessage`     | Feed message header                |
+| `BaseTripUpdate`      | Real-time trip schedule updates    |
+| `BaseStopTimeUpdate`  | Per-stop arrival/departure updates |
+| `BaseVehiclePosition` | Live vehicle locations             |
+| `BaseAlert`           | Service alerts and disruptions     |
 
 ## Custom Fields
 
 `gtfs.fields` provides Django model fields that encode GTFS type semantics:
 
-| Field | GTFS type | Notes |
-|---|---|---|
-| `ColorField` | `Color` | 6-digit hex, without `#` |
-| `CurrencyCodeField` | `Currency code` | ISO 4217, e.g. `USD` |
-| `CurrencyAmountField` | `Currency amount` | Decimal |
-| `ServiceDateField` | `Date` | Accepts/serialises `YYYYMMDD` |
-| `GTFSTimeField` | `Time` | `timedelta`; supports hours ≥ 24 |
-| `GTFSLocalTimeField` | `Local time` | String `HH:MM:SS`; hours 0–23 |
-| `GTFSIDField` | `ID` | CharField, optionally ASCII-only |
-| `GTFSTextField` | `Text` | CharField with 255-char default |
-| `GTFSTimezoneField` | `Timezone` | Validated IANA timezone name |
-| `LanguageCodeField` | `Language code` | BCP 47 tag, e.g. `en-US` |
-| `LatitudeField` | `Latitude` | Decimal, −90 to 90 |
-| `LongitudeField` | `Longitude` | Decimal, −180 to 180 |
-| `PhoneNumberField` | `Phone number` | Permissive international format |
-| `EnumIntegerField` | `Enum` | Integer with required `choices` |
-| `EnumCharField` | `Enum` | String with required `choices` |
+| Field                     | GTFS type         | Notes                            |
+| ------------------------- | ----------------- | -------------------------------- |
+| `GTFSColorField`          | `Color`           | 6-digit hex, without `#`         |
+| `GTFSCurrencyCodeField`   | `Currency code`   | ISO 4217, e.g. `USD`             |
+| `GTFSCurrencyAmountField` | `Currency amount` | Decimal                          |
+| `DateField`               | `Date`            | Accepts/serialises `YYYYMMDD`    |
+| `GTFSTimeField`           | `Time`            | `timedelta`; supports hours ≥ 24 |
+| `GTFSLocalTimeField`      | `Local time`      | String `HH:MM:SS`; hours 0–23    |
+| `GTFSIDField`             | `ID`              | CharField, optionally ASCII-only |
+| `GTFSTextField`           | `Text`            | CharField with 255-char default  |
+| `GTFSTimezoneField`       | `Timezone`        | Validated IANA timezone name     |
+| `GTFSLanguageCodeField`   | `Language code`   | BCP 47 tag, e.g. `en-US`         |
+| `GTFSLatitudeField`       | `Latitude`        | Decimal, −90 to 90               |
+| `GTFSLongitudeField`      | `Longitude`       | Decimal, −180 to 180             |
+| `GTFSPhoneNumberField`    | `Phone number`    | Permissive international format  |
+| `EnumIntegerField`        | `Enum`            | Integer with required `choices`  |
 
 ## Development
 

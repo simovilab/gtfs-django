@@ -3,18 +3,18 @@ from datetime import timedelta
 from django.core.exceptions import ValidationError
 
 from gtfs.fields import (
-    ColorField,
-    CurrencyCodeField,
+    GTFSColorField,
+    GTFSCurrencyAmountField,
     GTFSTimeField,
     GTFSLocalTimeField,
-    LanguageCodeField,
-    ServiceDateField,
+    GTFSLanguageCodeField,
+    DateField,
     GTFSTimezoneField,
 )
 
 
 def test_color_field_normalizes_and_validates():
-    field = ColorField()
+    field = GTFSColorField()
     assert field.clean("0039a6", None) == "0039A6"
     with pytest.raises(ValidationError):
         field.clean("#0039A6", None)
@@ -23,14 +23,14 @@ def test_color_field_normalizes_and_validates():
 
 
 def test_currency_code_field_normalizes_and_validates():
-    field = CurrencyCodeField()
+    field = GTFSCurrencyAmountField()
     assert field.clean("eur", None) == "EUR"
     with pytest.raises(ValidationError):
         field.clean("EURO", None)
 
 
 def test_service_date_field_parses_yyyymmdd():
-    field = ServiceDateField()
+    field = DateField()
     parsed = field.clean("20180913", None)
     assert parsed.year == 2018 and parsed.month == 9 and parsed.day == 13
 
@@ -49,7 +49,7 @@ def test_gtfs_local_time_field_rejects_over_23_hours():
 
 
 def test_language_code_field_validates_basic_bcp47():
-    field = LanguageCodeField()
+    field = GTFSLanguageCodeField()
     assert field.clean("en", None) == "en"
     assert field.clean("en-US", None) == "en-US"
     with pytest.raises(ValidationError):
