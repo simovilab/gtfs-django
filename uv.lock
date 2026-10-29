@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [[package]]
@@ -288,10 +288,11 @@ wheels = [
 
 [[package]]
 name = "gtfs-django"
-version = "0.3.0"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
     { name = "django" },
+    { name = "gtfs-io" },
     { name = "gtfs-realtime-bindings" },
     { name = "jinja2" },
     { name = "pyyaml" },
@@ -320,6 +321,7 @@ testing = [
 [package.metadata]
 requires-dist = [
     { name = "django", specifier = ">=5.2.0" },
+    { name = "gtfs-io", specifier = ">=0.0.1" },
     { name = "gtfs-realtime-bindings", specifier = ">=2.0.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "pyyaml", specifier = ">=6.0.2" },
@@ -343,6 +345,15 @@ docs = [
 testing = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.10.6" },
     { name = "tox", specifier = ">=4.30.2" },
+]
+
+[[package]]
+name = "gtfs-io"
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/e6/9e757daa7207ca9badcd0d0507e5f4cb35e62d3fa3b7401a7e4706bd59cf/gtfs_io-0.0.1.tar.gz", hash = "sha256:74bf58a25bddb204a482901f5e2aac73ec6ef31fcf59ed35b781c75565cab2a9", size = 13986, upload-time = "2026-04-21T20:41:09.211Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/c1/86060f215b171509e75bc2fe32fa37e32fee31b4c50f9cbe9cefd9619947/gtfs_io-0.0.1-py3-none-any.whl", hash = "sha256:bb029af76018fcdaadd88d953b049c2e88bc9a51b751f3b4fa2d5c08a09d9f52", size = 11716, upload-time = "2026-04-21T20:41:07.179Z" },
 ]
 
 [[package]]

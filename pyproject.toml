@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gtfs-django"
-version = "0.3.1"
+version = "0.3.2"
 description = "A Django app for managing GTFS data models and field types"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,6 +12,7 @@ license = { text = "Apache-2.0" }
 keywords = ["django", "gtfs", "transit", "schedule", "realtime"]
 dependencies = [
     "django>=5.2.0",
+    "gtfs-io>=0.0.1",
     "gtfs-realtime-bindings>=2.0.0",
     "jinja2>=3.1.6",
     "pyyaml>=6.0.2",
