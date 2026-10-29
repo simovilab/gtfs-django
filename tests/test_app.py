@@ -16,7 +16,7 @@ class TestGtfsPackage:
         import gtfs
 
         assert hasattr(gtfs, "__version__")
-        assert gtfs.__version__ == "0.1.0"
+        assert gtfs.__version__ == "0.3.1"
 
     def test_gtfs_app_config(self):
         """Test that the gtfs app config has the correct attributes."""

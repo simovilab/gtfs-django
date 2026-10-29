@@ -3,11 +3,6 @@
 These fields implement the GTFS Schedule field type semantics (validation and
 convenient parsing/normalization) while storing values using built-in Django
 field types.
-
-Note:
-        Some GTFS types already exist in Django (e.g. URLField, EmailField). This
-        module focuses on types that either don't exist in Django or need GTFS-
-        specific behavior (e.g. GTFS time allowing hours >= 24).
 """
 
 from __future__ import annotations

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gtfs-django"
-version = "0.3.0"
-description = "A Django app for processing and managing GTFS (General Transit Feed Specification) data"
+version = "0.3.1"
+description = "A Django app for managing GTFS data models and field types"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
