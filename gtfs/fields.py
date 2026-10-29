@@ -357,9 +357,7 @@ class GTFSIntegerField(models.IntegerField):
 class GTFSNonNegativeIntegerField(models.IntegerField):
     """GTFS integer constrained to values greater than or equal to zero."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        kwargs["validators"] = [*kwargs.get("validators", ()), MinValueValidator(0)]
-        super().__init__(*args, **kwargs)
+    default_validators = [MinValueValidator(0)]
 
 
 def _validate_non_zero_integer(value: int) -> None:
@@ -370,32 +368,23 @@ def _validate_non_zero_integer(value: int) -> None:
 class GTFSNonZeroIntegerField(models.IntegerField):
     """GTFS integer constrained to non-zero values."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        kwargs["validators"] = [
-            *kwargs.get("validators", ()),
-            _validate_non_zero_integer,
-        ]
-        super().__init__(*args, **kwargs)
+    default_validators = [_validate_non_zero_integer]
 
 
 class GTFSPositiveIntegerField(models.IntegerField):
     """GTFS integer constrained to values greater than zero."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        kwargs["validators"] = [*kwargs.get("validators", ()), MinValueValidator(1)]
-        super().__init__(*args, **kwargs)
+    default_validators = [MinValueValidator(1)]
 
 
 class GTFSNonNegativeFloatField(models.DecimalField):
     """GTFS decimal constrained to values greater than or equal to zero."""
 
+    default_validators = [MinValueValidator(Decimal("0"))]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("max_digits", 18)
         kwargs.setdefault("decimal_places", 6)
-        kwargs["validators"] = [
-            *kwargs.get("validators", ()),
-            MinValueValidator(Decimal("0")),
-        ]
         super().__init__(*args, **kwargs)
 
 
@@ -407,13 +396,11 @@ def _validate_positive_float(value: Decimal) -> None:
 class GTFSPositiveFloatField(models.DecimalField):
     """GTFS decimal constrained to values greater than zero."""
 
+    default_validators = [_validate_positive_float]
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("max_digits", 18)
         kwargs.setdefault("decimal_places", 6)
-        kwargs["validators"] = [
-            *kwargs.get("validators", ()),
-            _validate_positive_float,
-        ]
         super().__init__(*args, **kwargs)
 
 
