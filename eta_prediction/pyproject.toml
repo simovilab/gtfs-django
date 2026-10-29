@@ -1,0 +1,34 @@
+[project]
+name = "eta_prediction"
+version = "0.1.0"
+description = "Utilities for exploring GTFS-Realtime feeds (Vehicle Positions, Trip Updates, Alerts)."
+authors = [
+    { name = "Jæ" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+  "Django>=5.0",
+  "celery>=5.4",
+  "redis>=5.0",
+  "psycopg[binary,pool]>=3.2",
+  "django-environ>=0.11",
+  "python-dotenv>=1.0",
+  "requests>=2.32",
+  "gtfs-realtime-bindings>=1.0.0",
+  "numpy>=1.26",
+  "pandas>=2.3.3",
+  "fastparquet>=2024.11.0",
+  "psycopg>=3.2.11",
+  "matplotlib>=3.9.4",
+  "scikit-learn>=1.7.2",
+  "xgboost>=3.1.2",
+]
+
+[tool.uv.workspace]
+members = [
+    "feature_engineering/proj",
+    "feature_engineering",
+]
