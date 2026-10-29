@@ -279,6 +279,7 @@ class GTFSIDField(models.CharField):
         enforce_printable_ascii: bool = False,
         **kwargs: Any,
     ) -> None:
+        self.enforce_printable_ascii = enforce_printable_ascii
         kwargs.setdefault("max_length", 255)
         super().__init__(*args, **kwargs)
 
@@ -290,6 +291,12 @@ class GTFSIDField(models.CharField):
                     code="invalid",
                 )
             )
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        if self.enforce_printable_ascii:
+            kwargs["enforce_printable_ascii"] = True
+        return name, path, args, kwargs
 
 
 class GTFSLanguageCodeField(models.CharField):
@@ -472,6 +479,12 @@ class _BaseGTFSTimeField(models.CharField):
         kwargs.setdefault("max_length", 11)
         super().__init__(*args, **kwargs)
 
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        # max_hour is a required keyword-only argument, so always return it.
+        kwargs["max_hour"] = self._max_hour
+        return name, path, args, kwargs
+
     def to_python(self, value: Any) -> Any:
         value = super().to_python(value)
         if value in (None, ""):
@@ -497,6 +510,12 @@ class GTFSLocalTimeField(_BaseGTFSTimeField):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, max_hour=23, **kwargs)
+
+    def deconstruct(self) -> tuple[str | None, str, list[Any], dict[str, Any]]:
+        name, path, args, kwargs = super().deconstruct()
+        # max_hour is fixed to 23 by __init__, so it is not a field argument.
+        del kwargs["max_hour"]
+        return name, path, args, kwargs
 
 
 class GTFSTextField(models.CharField):
