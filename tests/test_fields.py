@@ -4,11 +4,11 @@ from django.core.exceptions import ValidationError
 
 from gtfs.fields import (
     GTFSColorField,
-    GTFSCurrencyAmountField,
+    GTFSCurrencyCodeField,
     GTFSTimeField,
     GTFSLocalTimeField,
     GTFSLanguageCodeField,
-    DateField,
+    GTFSDateField,
     GTFSTimezoneField,
 )
 
@@ -23,14 +23,14 @@ def test_color_field_normalizes_and_validates():
 
 
 def test_currency_code_field_normalizes_and_validates():
-    field = GTFSCurrencyAmountField()
+    field = GTFSCurrencyCodeField()
     assert field.clean("eur", None) == "EUR"
     with pytest.raises(ValidationError):
         field.clean("EURO", None)
 
 
 def test_service_date_field_parses_yyyymmdd():
-    field = DateField()
+    field = GTFSDateField()
     parsed = field.clean("20180913", None)
     assert parsed.year == 2018 and parsed.month == 9 and parsed.day == 13
 

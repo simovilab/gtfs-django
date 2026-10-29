@@ -1,5 +1,4 @@
 import django
-import pytest
 
 
 class TestGtfsPackage:
